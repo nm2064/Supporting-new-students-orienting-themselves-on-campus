@@ -1,6 +1,34 @@
 # AI-Assisted Student Onboarding System
 
-## Project Timeline (12 January - 26 March 2026)
+## Semester 1 Timeline
+
+```mermaid
+gantt
+    title Semester 1 - Dissertation Progress
+    dateFormat  YYYY-MM-DD
+    axisFormat  %b %d
+
+    section Literature Review
+    Initial reading & research    :lit1, 2025-09-15, 2w
+    Identify key papers           :lit2, after lit1, 1w
+    Write literature review       :lit3, after lit2, 3w
+
+    section Requirements & Design
+    Requirements gathering        :req1, 2025-10-06, 2w
+    System design                 :des1, after req1, 2w
+    Design documentation          :des2, after des1, 1w
+
+    section Implementation
+    Environment setup             :imp1, 2025-10-27, 1w
+    Core functionality            :imp2, after imp1, 3w
+    Initial testing               :imp3, after imp2, 1w
+
+    section Documentation
+    Progress report               :doc1, 2025-11-24, 2w
+    Interim submission            :milestone, crit, 2025-12-08, 1d
+```
+
+## Semester 2 Timeline (12 January - 26 March 2026)
 
 Implementation timeline for the AI-powered onboarding application for Heriot-Watt University new and international students.
 
