@@ -1,6 +1,6 @@
 # AI-Assisted Student Onboarding System
 
-## Semester 1 Timeline
+## Semester 1 Timeline (8 September - 20 Nov 2026)
 
 ```mermaid
 gantt
