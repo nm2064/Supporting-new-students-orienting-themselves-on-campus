@@ -7,29 +7,27 @@ gantt
     title Semester 1 - Dissertation Progress
     dateFormat  YYYY-MM-DD
 
-    section Week 1-2 (15-28 Sep)
-    Initial reading & research                      :lit1, 2025-09-15, 14d
+    section Week 1 (8-14 Sep)
+    Project scoping & supervisor meetings           :w1, 2025-09-08, 7d
 
-    section Week 3 (29 Sep-5 Oct)
-    Identify key papers                             :lit2, 2025-09-29, 7d
+    section Week 2 (15-21 Sep)
+    Project allocation & literature review          :w2, 2025-09-15, 7d
 
-    section Week 4-6 (6-26 Oct)
-    Write literature review                         :lit3, 2025-10-06, 21d
+    section Week 3 (22-28 Sep)
+    Background research on onboarding challenges    :w3, 2025-09-22, 7d
 
-    section Week 7-8 (27 Oct-9 Nov)
-    Requirements gathering                          :req1, 2025-10-27, 14d
+    section Week 4-5 (29 Sep-12 Oct)
+    Background research on RAG & multilingual AI    :w4, 2025-09-29, 14d
 
-    section Week 9-10 (10-23 Nov)
-    System design                                   :des1, 2025-11-10, 14d
+    section Week 6-7 (13-26 Oct)
+    Methodology design & requirements analysis      :w6, 2025-10-13, 14d
 
-    section Week 11 (24-30 Nov)
-    Design documentation                            :des2, 2025-11-24, 7d
+    section Week 8-9 (27 Oct-9 Nov)
+    Technical architecture & feasibility            :w8, 2025-10-27, 14d
 
-    section Week 12-13 (1-14 Dec)
-    Progress report                                 :doc1, 2025-12-01, 14d
-
-    section Week 14 (8 Dec)
-    Interim submission                              :milestone, crit, 2025-12-08, 1d
+    section Week 10-11 (10-20 Nov)
+    Deliverable writing & UI mockup development     :crit, w10, 2025-11-10, 11d
+    D1 & D2 Submission                              :milestone, submit, 2025-11-20, 0d
 ```
 
 ## Semester 2 Timeline (12 January - 26 March 2026)
