@@ -6,26 +6,30 @@
 gantt
     title Semester 1 - Dissertation Progress
     dateFormat  YYYY-MM-DD
-    axisFormat  %b %d
 
-    section Literature Review
-    Initial reading & research    :lit1, 2025-09-15, 2w
-    Identify key papers           :lit2, after lit1, 1w
-    Write literature review       :lit3, after lit2, 3w
+    section Week 1-2 (15-28 Sep)
+    Initial reading & research                      :lit1, 2025-09-15, 14d
 
-    section Requirements & Design
-    Requirements gathering        :req1, 2025-10-06, 2w
-    System design                 :des1, after req1, 2w
-    Design documentation          :des2, after des1, 1w
+    section Week 3 (29 Sep-5 Oct)
+    Identify key papers                             :lit2, 2025-09-29, 7d
 
-    section Implementation
-    Environment setup             :imp1, 2025-10-27, 1w
-    Core functionality            :imp2, after imp1, 3w
-    Initial testing               :imp3, after imp2, 1w
+    section Week 4-6 (6-26 Oct)
+    Write literature review                         :lit3, 2025-10-06, 21d
 
-    section Documentation
-    Progress report               :doc1, 2025-11-24, 2w
-    Interim submission            :milestone, crit, 2025-12-08, 1d
+    section Week 7-8 (27 Oct-9 Nov)
+    Requirements gathering                          :req1, 2025-10-27, 14d
+
+    section Week 9-10 (10-23 Nov)
+    System design                                   :des1, 2025-11-10, 14d
+
+    section Week 11 (24-30 Nov)
+    Design documentation                            :des2, 2025-11-24, 7d
+
+    section Week 12-13 (1-14 Dec)
+    Progress report                                 :doc1, 2025-12-01, 14d
+
+    section Week 14 (8 Dec)
+    Interim submission                              :milestone, crit, 2025-12-08, 1d
 ```
 
 ## Semester 2 Timeline (12 January - 26 March 2026)
