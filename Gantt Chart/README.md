@@ -4,18 +4,17 @@
 
 ```mermaid
 gantt
-    title Semester 1 - Research Paper Progress (Revised with Overlaps)
+    title Semester 1 - Research Paper Progress
     dateFormat  YYYY-MM-DD
 
     section Research & Planning
     Project scoping & supervisor meetings           :plan1, 2025-09-08, 7d
     Literature review                               :plan2, 2025-09-15, 14d
-    Background research on onboarding               :plan3, 2025-09-22, 7d
-    Background research on RAG & multilingual AI    :plan4, 2025-09-29, 14d
-    Methodology design & requirements               :plan5, 2025-10-13, 14d
-    Ethics submission preparation                   :plan6, 2025-10-13, 12d
-    Technical architecture & feasibility            :plan7, 2025-10-27, 14d
-    UI mockup development                           :plan8, 2025-10-30, 10d
+    Background research                             :plan3, 2025-09-22, 21d
+    Methodology design & requirements               :plan4, 2025-10-13, 14d
+    Ethics submission preparation                   :plan5, 2025-10-13, 12d
+    Technical architecture & feasibility            :plan6, 2025-10-27, 14d
+    UI mockup development                           :plan7, 2025-10-30, 10d
 
     section Writing Tasks
     Early methodology drafting                      :write1, 2025-10-06, 7d
