@@ -1,0 +1,69 @@
+# Knowledge Base - University Information
+
+## Campus Location
+The main campus is located at 123 University Avenue, Academic City, AC 12345.
+The campus is accessible via public transportation, with the University Metro Station located just 500 meters from the main entrance.
+
+## Library Hours
+The University Library is open Monday through Friday from 8:00 AM to 10:00 PM.
+On weekends, the library operates from 10:00 AM to 6:00 PM.
+During exam periods, the library extends its hours and remains open 24/7 for the final two weeks of each semester.
+The library offers quiet study zones, group study rooms, and access to over 500,000 digital resources.
+
+## Academic Calendar
+Fall Semester 2024:
+- Classes begin: September 2, 2024
+- Add/Drop deadline: September 9, 2024
+- Mid-term exams: October 21-25, 2024
+- Thanksgiving break: November 28-29, 2024
+- Final exams: December 9-13, 2024
+- Winter break begins: December 14, 2024
+
+Spring Semester 2025:
+- Classes begin: January 13, 2025
+- Add/Drop deadline: January 20, 2025
+- Spring break: March 10-14, 2025
+- Final exams: May 5-9, 2025
+- Commencement: May 17, 2025
+
+## Computer Science Department
+The Computer Science Department offers undergraduate and graduate programs.
+Undergraduate degrees include Bachelor of Science in Computer Science and Bachelor of Science in Data Science.
+Graduate programs include Master's in Computer Science and Ph.D. in Computer Science.
+The department is located in the Science Building, rooms 201-300.
+Department office hours are Monday-Friday, 9:00 AM to 5:00 PM.
+
+## IT Support
+For technical support, contact the IT Help Desk at helpdesk@university.edu or call (555) 123-4567.
+The IT Help Desk is available Monday through Friday, 8:00 AM to 8:00 PM.
+For after-hours emergencies, use the online ticket system at support.university.edu.
+Common services include password resets, Wi-Fi troubleshooting, and software installation support.
+
+## Student Housing
+On-campus housing is available for undergraduate and graduate students.
+The residence halls include:
+- North Hall: First-year students, shared rooms
+- South Hall: Upperclassmen, suite-style living
+- Graduate Village: Apartments for graduate students and families
+Applications for housing open on February 1 for the following academic year.
+Priority is given to students who apply before March 15.
+
+## Dining Services
+The university operates five dining halls and twelve cafes across campus.
+Meal plans are available for resident and commuter students.
+The main dining hall, University Commons, is open daily from 7:00 AM to 9:00 PM.
+Special dietary accommodations including vegetarian, vegan, halal, and kosher options are available at all locations.
+
+## Parking Information
+Student parking permits cost $150 per semester.
+Faculty and staff permits cost $200 per year.
+Visitor parking is available in Lot A at $2 per hour.
+Parking enforcement operates Monday through Friday, 7:00 AM to 10:00 PM.
+All vehicles must display a valid permit to avoid fines.
+
+## Health Services
+The University Health Center provides medical care for all enrolled students.
+Services include primary care, mental health counseling, vaccinations, and wellness programs.
+The Health Center is open Monday through Friday, 8:00 AM to 6:00 PM.
+Appointments can be scheduled online at health.university.edu or by calling (555) 987-6543.
+Emergency services are available 24/7 through the campus safety escort program.

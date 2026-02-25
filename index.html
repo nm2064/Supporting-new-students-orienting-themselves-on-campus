@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html class="light" lang="en">
+<head>
+    <meta charset="utf-8"/>
+    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <title>UniAssistant - Multilingual Onboarding</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Lexend:wght@300;400;500;600;700;800;900&family=Noto+Sans+Arabic:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
+    <script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#135bec",
+                        "background-light": "#f6f6f8",
+                        "background-dark": "#101622",
+                    },
+                    fontFamily: {
+                        "display": ["Lexend", "Noto Sans Arabic", "sans-serif"]
+                    },
+                },
+            },
+        }
+    </script>
+    <style>
+        body { font-family: 'Lexend', sans-serif; }
+        .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        .map-bg {
+            background-image: url(https://lh3.googleusercontent.com/aida-public/AB6AXuAa9by2TvDZcqG7P2yGFuZXOmCJSbigZA0tQTZHPV7i3Q5f7gc3FVZbTxXLT4DV_Xn8BrbpU9hpQBMg2jmSweUs_it20K8RTbAem6Ynx6y5wCfmM2Nth9ktBFgpySFBpfpkxjf7BBYV8PwEjc0jitqfL79cK-J5-S0H5fPKcsiZ9uiyOeiDbWdiozaeWqQB8bCDWXRUNC11dajLUu4DIWjPV9zoJOUqWsyHS_TVcGjCeIaFcbxwy0eEbyCbOLDNm5JRJoUx0D6GWR0);
+            background-size: cover;
+            background-position: center;
+        }
+    </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark text-[#111318] dark:text-white">
+    <div id="root"></div>
+
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/history@5/umd/history.development.js"></script>
+    <script src="https://unpkg.com/react-router@6.3.0/umd/react-router.development.js"></script>
+    <script src="https://unpkg.com/react-router-dom@6.3.0/umd/react-router-dom.development.js"></script>
+    <script src="https://unpkg.com/babel-standalone@6/babel.min.js"></script>
+    <script type="text/babel">
+        const { useEffect, useMemo, useState, useContext, createContext } = React;
+        const { createRoot } = ReactDOM;
+        const { MemoryRouter, Routes, Route, Link, useNavigate } = ReactRouterDOM;
+
+        const STORAGE_UI_LANG = "uniAssistant_ui_language";
+        const STORAGE_AUTO_DETECT = "uniAssistant_auto_detect_enabled";
+        const SUPPORTED_LANGS = ["en", "zh-Hans", "hi", "ar"];
+
+        const I18N = {
+            en: {
+                appName: "UniAssistant",
+                homeTitle: "Your Campus Assistant",
+                homeSubtitle: "Find services, events, maps, and multilingual chat support.",
+                navHome: "Home",
+                navChat: "Chat",
+                navMap: "Map",
+                navServices: "Services",
+                navEvents: "Events",
+                onboardingTitle: "Language Preferences",
+                onboardingSubtitle: "Choose your interface language and auto-detect behavior.",
+                confirm: "Save Preferences",
+                autoDetect: "Auto-detect language from messages",
+                activeLanguage: "Currently active language",
+                selectedLanguage: "Preferred fallback language",
+                chatPlaceholder: "Ask about campus...",
+                assistantIntro: "Hi! I'm UniBot. Ask me about library hours, parking, housing, services, and events.",
+                clear: "Clear",
+                quickQuestions: "Quick questions",
+                language: "Language",
+                locationHint: "Main Library • 4 mins walk",
+                servicesTitle: "Student Services",
+                eventsTitle: "Upcoming Events"
+            },
+            "zh-Hans": {
+                appName: "大学助手",
+                homeTitle: "校园智能助手",
+                homeSubtitle: "查询服务、活动、地图，并使用多语言聊天。",
+                navHome: "首页",
+                navChat: "聊天",
+                navMap: "地图",
+                navServices: "服务",
+                navEvents: "活动",
+                onboardingTitle: "语言设置",
+                onboardingSubtitle: "选择界面语言和自动检测行为。",
+                confirm: "保存设置",
+                autoDetect: "根据消息自动检测语言",
+                activeLanguage: "当前生效语言",
+                selectedLanguage: "首选回退语言",
+                chatPlaceholder: "输入校园问题...",
+                assistantIntro: "你好！我是 UniBot。你可以咨询图书馆、停车、住宿、服务和活动。",
+                clear: "清空",
+                quickQuestions: "快捷问题",
+                language: "语言",
+                locationHint: "主图书馆 • 步行4分钟",
+                servicesTitle: "学生服务",
+                eventsTitle: "近期活动"
+            },
+            hi: {
+                appName: "यूनि असिस्टेंट",
+                homeTitle: "आपका कैंपस सहायक",
+                homeSubtitle: "सेवाएं, इवेंट, मैप और बहुभाषी चैट सहायता प्राप्त करें।",
+                navHome: "होम",
+                navChat: "चैट",
+                navMap: "मानचित्र",
+                navServices: "सेवाएं",
+                navEvents: "इवेंट",
+                onboardingTitle: "भाषा प्राथमिकताएँ",
+                onboardingSubtitle: "इंटरफ़ेस भाषा और ऑटो-डिटेक्ट व्यवहार चुनें।",
+                confirm: "सेटिंग सहेजें",
+                autoDetect: "संदेश से भाषा स्वतः पहचानें",
+                activeLanguage: "वर्तमान सक्रिय भाषा",
+                selectedLanguage: "पसंदीदा बैकअप भाषा",
+                chatPlaceholder: "कैंपस के बारे में पूछें...",
+                assistantIntro: "नमस्ते! मैं UniBot हूँ। आप लाइब्रेरी, पार्किंग, हॉस्टल, सेवाओं और इवेंट्स के बारे में पूछ सकते हैं।",
+                clear: "साफ़ करें",
+                quickQuestions: "त्वरित प्रश्न",
+                language: "भाषा",
+                locationHint: "मुख्य पुस्तकालय • 4 मिनट पैदल",
+                servicesTitle: "छात्र सेवाएँ",
+                eventsTitle: "आगामी कार्यक्रम"
+            },
+            ar: {
+                appName: "مساعد الجامعة",
+                homeTitle: "مساعدك الجامعي",
+                homeSubtitle: "اعثر على الخدمات والفعاليات والخريطة والدعم متعدد اللغات.",
+                navHome: "الرئيسية",
+                navChat: "الدردشة",
+                navMap: "الخريطة",
+                navServices: "الخدمات",
+                navEvents: "الفعاليات",
+                onboardingTitle: "تفضيلات اللغة",
+                onboardingSubtitle: "اختر لغة الواجهة وسلوك الاكتشاف التلقائي.",
+                confirm: "حفظ التفضيلات",
+                autoDetect: "اكتشاف اللغة تلقائيًا من الرسائل",
+                activeLanguage: "اللغة النشطة حاليًا",
+                selectedLanguage: "لغة النسخ الاحتياطي المفضلة",
+                chatPlaceholder: "اسأل عن الحرم الجامعي...",
+                assistantIntro: "مرحبًا! أنا UniBot. اسألني عن ساعات المكتبة، المواقف، السكن، الخدمات والفعاليات.",
+                clear: "مسح",
+                quickQuestions: "أسئلة سريعة",
+                language: "اللغة",
+                locationHint: "المكتبة الرئيسية • 4 دقائق مشيًا",
+                servicesTitle: "خدمات الطلاب",
+                eventsTitle: "الفعاليات القادمة"
+            }
+        };
+
+        const LANG_OPTIONS = [
+            { id: "en", label: "English" },
+            { id: "zh-Hans", label: "简体中文" },
+            { id: "hi", label: "हिन्दी" },
+            { id: "ar", label: "العربية" },
+        ];
+
+        const LanguageContext = createContext(null);
+
+        const readStoredLang = () => {
+            try {
+                const value = localStorage.getItem(STORAGE_UI_LANG) || "en";
+                return SUPPORTED_LANGS.includes(value) ? value : "en";
+            } catch (e) {
+                return "en";
+            }
+        };
+
+        const readStoredAutoDetect = () => {
+            try {
+                const value = localStorage.getItem(STORAGE_AUTO_DETECT);
+                return value === null ? true : value === "true";
+            } catch (e) {
+                return true;
+            }
+        };
+
+        const LanguageProvider = ({ children }) => {
+            const [uiLanguage, setUiLanguage] = useState(readStoredLang);
+            const [autoDetectEnabled, setAutoDetectEnabled] = useState(readStoredAutoDetect);
+            const [sessionDetectedLanguage, setSessionDetectedLanguageState] = useState(null);
+
+            const activeLanguage = autoDetectEnabled && sessionDetectedLanguage
+                ? sessionDetectedLanguage
+                : uiLanguage;
+
+            useEffect(() => {
+                try { localStorage.setItem(STORAGE_UI_LANG, uiLanguage); } catch (e) {}
+            }, [uiLanguage]);
+
+            useEffect(() => {
+                try { localStorage.setItem(STORAGE_AUTO_DETECT, String(autoDetectEnabled)); } catch (e) {}
+            }, [autoDetectEnabled]);
+
+            useEffect(() => {
+                document.documentElement.lang = activeLanguage;
+                document.documentElement.dir = activeLanguage === "ar" ? "rtl" : "ltr";
+            }, [activeLanguage]);
+
+            const setLanguage = (lang) => {
+                if (!SUPPORTED_LANGS.includes(lang)) return;
+                setUiLanguage(lang);
+                setSessionDetectedLanguageState(null);
+            };
+
+            const toggleAutoDetect = () => {
+                setAutoDetectEnabled((prev) => {
+                    const next = !prev;
+                    if (!next) {
+                        setSessionDetectedLanguageState(null);
+                    }
+                    return next;
+                });
+            };
+
+            const setSessionDetectedLanguage = (lang) => {
+                if (!autoDetectEnabled || !SUPPORTED_LANGS.includes(lang)) return;
+                setSessionDetectedLanguageState(lang);
+            };
+
+            const value = useMemo(() => ({
+                uiLanguage,
+                autoDetectEnabled,
+                sessionDetectedLanguage,
+                activeLanguage,
+                setLanguage,
+                toggleAutoDetect,
+                setSessionDetectedLanguage,
+            }), [uiLanguage, autoDetectEnabled, sessionDetectedLanguage, activeLanguage]);
+
+            return <LanguageContext.Provider value={value}>{children}</LanguageContext.Provider>;
+        };
+
+        const useLanguage = () => useContext(LanguageContext);
+
+        const useT = () => {
+            const { activeLanguage } = useLanguage();
+            return I18N[activeLanguage] || I18N.en;
+        };
+
+        const BottomNav = ({ active }) => {
+            const t = useT();
+            const items = [
+                { id: "home", icon: "home", label: t.navHome, path: "/" },
+                { id: "chat", icon: "chat", label: t.navChat, path: "/chat" },
+                { id: "map", icon: "map", label: t.navMap, path: "/map" },
+                { id: "services", icon: "apps", label: t.navServices, path: "/services" },
+                { id: "events", icon: "event", label: t.navEvents, path: "/events" },
+            ];
+            return (
+                <nav className="fixed bottom-0 left-0 right-0 bg-white/95 dark:bg-background-dark/95 backdrop-blur border-t border-gray-200 dark:border-gray-800 px-2 py-2 z-50">
+                    <div className="max-w-[640px] mx-auto flex items-center justify-around">
+                        {items.map((item) => (
+                            <Link key={item.id} to={item.path} className={`flex flex-col items-center gap-1 p-2 ${active === item.id ? "text-primary" : "text-gray-500"}`}>
+                                <span className="material-symbols-outlined">{item.icon}</span>
+                                <span className="text-[11px] font-semibold">{item.label}</span>
+                            </Link>
+                        ))}
+                    </div>
+                </nav>
+            );
+        };
+
+        const Header = ({ title }) => {
+            const navigate = useNavigate();
+            const t = useT();
+            return (
+                <header className="sticky top-0 z-40 bg-white dark:bg-background-dark border-b border-gray-200 dark:border-gray-800">
+                    <div className="max-w-[960px] mx-auto px-4 py-3 flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                            <div className="w-8 h-8 bg-primary text-white rounded-lg grid place-items-center">
+                                <span className="material-symbols-outlined text-base">school</span>
+                            </div>
+                            <h1 className="font-bold">{title || t.appName}</h1>
+                        </div>
+                        <button onClick={() => navigate("/onboarding")} className="px-3 py-2 bg-gray-100 dark:bg-gray-800 rounded-lg text-sm flex items-center gap-1">
+                            <span className="material-symbols-outlined text-base">language</span>
+                            <span>{t.language}</span>
+                        </button>
+                    </div>
+                </header>
+            );
+        };
+
+        const HomePage = () => {
+            const t = useT();
+            return (
+                <div className="min-h-screen pb-24">
+                    <Header />
+                    <main className="max-w-[960px] mx-auto px-4 py-8">
+                        <h2 className="text-3xl font-black">{t.homeTitle}</h2>
+                        <p className="text-gray-500 mt-2">{t.homeSubtitle}</p>
+                        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-8">
+                            <Link to="/chat" className="p-5 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
+                                <span className="material-symbols-outlined text-primary">forum</span>
+                                <p className="font-bold mt-2">{t.navChat}</p>
+                            </Link>
+                            <Link to="/map" className="p-5 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
+                                <span className="material-symbols-outlined text-primary">map</span>
+                                <p className="font-bold mt-2">{t.navMap}</p>
+                            </Link>
+                            <Link to="/services" className="p-5 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
+                                <span className="material-symbols-outlined text-primary">grid_view</span>
+                                <p className="font-bold mt-2">{t.navServices}</p>
+                            </Link>
+                            <Link to="/events" className="p-5 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
+                                <span className="material-symbols-outlined text-primary">event</span>
+                                <p className="font-bold mt-2">{t.navEvents}</p>
+                            </Link>
+                        </div>
+                    </main>
+                    <BottomNav active="home" />
+                </div>
+            );
+        };
+
+        const ChatPage = () => {
+            const t = useT();
+            const { uiLanguage, autoDetectEnabled, setSessionDetectedLanguage } = useLanguage();
+            const [messages, setMessages] = useState([{ role: "assistant", text: t.assistantIntro }]);
+            const [input, setInput] = useState("");
+            const [loading, setLoading] = useState(false);
+            const [followUps, setFollowUps] = useState([]);
+            const [lastEffectiveLanguage, setLastEffectiveLanguage] = useState(null);
+            const [lastConfidence, setLastConfidence] = useState(null);
+            const [expandedCitations, setExpandedCitations] = useState({});
+
+            useEffect(() => {
+                setMessages((prev) => {
+                    if (prev.length === 1 && prev[0].role === "assistant") {
+                        return [{ role: "assistant", text: t.assistantIntro }];
+                    }
+                    return prev;
+                });
+            }, [t.assistantIntro]);
+
+            const getConversationId = () => {
+                let id = localStorage.getItem("unibot_conversation_id");
+                if (!id) {
+                    id = (typeof crypto !== "undefined" && crypto.randomUUID) ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`;
+                    localStorage.setItem("unibot_conversation_id", id);
+                }
+                return id;
+            };
+
+            const sendMessage = async () => {
+                if (!input.trim() || loading) return;
+                const userText = input.trim();
+                setInput("");
+                setLoading(true);
+                setMessages((prev) => [...prev, { role: "user", text: userText }]);
+
+                try {
+                    const res = await fetch("http://localhost:8000/rag-chat", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            message: userText,
+                            conversation_id: getConversationId(),
+                            ui_language: uiLanguage,
+                            auto_detect: autoDetectEnabled
+                        }),
+                    });
+                    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+                    const data = await res.json();
+                    const answer = data.answer_markdown || data.answer || "No answer returned.";
+                    const citations = Array.isArray(data.citations) ? data.citations : (data.sources || []);
+
+                    setMessages((prev) => [...prev, {
+                        role: "assistant",
+                        text: answer,
+                        citations,
+                        needsHumanHandoff: !!data.needs_human_handoff,
+                        clarifyingQuestion: data.clarifying_question || null,
+                    }]);
+
+                    if (data.clarifying_question) {
+                        setMessages((prev) => [...prev, { role: "assistant", text: data.clarifying_question }]);
+                    }
+
+                    setFollowUps(Array.isArray(data.follow_up_suggestions) ? data.follow_up_suggestions : []);
+                    setLastEffectiveLanguage(data.effective_language || null);
+                    setLastConfidence(typeof data.confidence === "number" ? data.confidence : null);
+
+                    if (autoDetectEnabled && data.effective_language) {
+                        setSessionDetectedLanguage(data.effective_language);
+                    }
+                } catch (err) {
+                    setMessages((prev) => [...prev, { role: "assistant", text: "Error contacting backend. Please try again." }]);
+                } finally {
+                    setLoading(false);
+                }
+            };
+
+            const clearChat = () => {
+                setMessages([{ role: "assistant", text: t.assistantIntro }]);
+                setFollowUps([]);
+                localStorage.removeItem("unibot_conversation_id");
+            };
+
+            return (
+                <div className="bg-background-light dark:bg-background-dark font-display flex justify-center min-h-screen pb-24">
+                    <div className="relative w-full max-w-[520px] bg-white dark:bg-gray-900 shadow-2xl flex flex-col h-screen overflow-hidden border-x border-gray-100 dark:border-gray-800">
+                        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-gray-800 bg-white/95 dark:bg-gray-900/95">
+                            <div>
+                                <h2 className="font-bold">UniBot</h2>
+                                <p className="text-xs text-gray-500">
+                                    {lastEffectiveLanguage ? `effective_language=${lastEffectiveLanguage}` : "effective_language=n/a"}
+                                    {lastConfidence !== null ? ` • confidence=${Math.round(lastConfidence * 100)}%` : ""}
+                                </p>
+                            </div>
+                            <button onClick={clearChat} className="px-3 py-1.5 text-sm bg-gray-100 dark:bg-gray-800 rounded-lg">{t.clear}</button>
+                        </div>
+
+                        <div className="flex-1 overflow-y-auto p-4 space-y-4 text-start">
+                            {messages.map((msg, idx) => {
+                                const isUser = msg.role === "user";
+                                return (
+                                    <div key={idx} className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
+                                        <div className={`max-w-[85%] rounded-2xl px-4 py-3 ${isUser ? "bg-primary text-white" : "bg-gray-100 dark:bg-gray-800"}`}>
+                                            <div className="whitespace-pre-wrap text-sm leading-relaxed">{msg.text}</div>
+                                            {msg.citations && msg.citations.length > 0 && (
+                                                <div className="mt-2 border-t border-gray-300/40 pt-2">
+                                                    <button onClick={() => setExpandedCitations((prev) => ({ ...prev, [idx]: !prev[idx] }))} className="text-xs text-primary">
+                                                        {expandedCitations[idx] ? "Hide citations" : "Show citations"}
+                                                    </button>
+                                                    {expandedCitations[idx] && (
+                                                        <div className="mt-2 space-y-2">
+                                                            {msg.citations.map((c, cIdx) => (
+                                                                <div key={cIdx} className="text-xs bg-white/60 dark:bg-black/20 rounded-md p-2">
+                                                                    <div>{c.chunk_id || c.source || `source_${cIdx + 1}`}</div>
+                                                                    <div className="text-gray-500">{c.source_url || c.source || ""}</div>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                            {loading && <div className="text-xs text-gray-500">...</div>}
+                        </div>
+
+                        {followUps.length > 0 && (
+                            <div className="px-4 py-2 border-t border-gray-200 dark:border-gray-800">
+                                <p className="text-xs text-gray-500 mb-2">{t.quickQuestions}</p>
+                                <div className="flex gap-2 overflow-x-auto hide-scrollbar">
+                                    {followUps.map((item, i) => (
+                                        <button key={i} onClick={() => setInput(item)} className="px-3 py-1.5 rounded-full bg-gray-100 dark:bg-gray-800 text-xs whitespace-nowrap">{item}</button>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        <div className="p-4 border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
+                            <div className="flex items-center gap-2 bg-gray-100 dark:bg-gray-800 rounded-2xl px-3 py-2">
+                                <input
+                                    className="flex-1 bg-transparent outline-none text-sm"
+                                    value={input}
+                                    onChange={(e) => setInput(e.target.value)}
+                                    onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); sendMessage(); }}}
+                                    placeholder={t.chatPlaceholder}
+                                />
+                                <button onClick={sendMessage} disabled={loading || !input.trim()} className="bg-primary text-white w-10 h-10 rounded-xl disabled:opacity-50">
+                                    <span className="material-symbols-outlined text-xl">send</span>
+                                </button>
+                            </div>
+                        </div>
+                        <BottomNav active="chat" />
+                    </div>
+                </div>
+            );
+        };
+
+        const MapPage = () => {
+            const t = useT();
+            return (
+                <div className="min-h-screen pb-24">
+                    <Header />
+                    <main className="max-w-[960px] mx-auto p-4">
+                        <div className="map-bg rounded-2xl min-h-[420px] relative border border-gray-200">
+                            <div className="absolute bottom-4 start-4 bg-white/95 rounded-xl p-3 shadow text-start">
+                                <div className="font-bold">Main Library</div>
+                                <div className="text-sm text-gray-500">{t.locationHint}</div>
+                            </div>
+                        </div>
+                    </main>
+                    <BottomNav active="map" />
+                </div>
+            );
+        };
+
+        const ServicesPage = () => {
+            const t = useT();
+            const cards = ["IT Services", "Housing", "Health & Wellbeing", "Academic Registry", "Careers", "Student Support"];
+            return (
+                <div className="min-h-screen pb-24">
+                    <Header />
+                    <main className="max-w-[960px] mx-auto px-4 py-8">
+                        <h2 className="text-3xl font-black">{t.servicesTitle}</h2>
+                        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-6">
+                            {cards.map((card) => (
+                                <div key={card} className="p-4 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">{card}</div>
+                            ))}
+                        </div>
+                    </main>
+                    <BottomNav active="services" />
+                </div>
+            );
+        };
+
+        const EventsPage = () => {
+            const t = useT();
+            const items = ["Freshers Mixer", "Study Skills Workshop", "Club Fair", "Career Networking"];
+            return (
+                <div className="min-h-screen pb-24">
+                    <Header />
+                    <main className="max-w-[960px] mx-auto px-4 py-8">
+                        <h2 className="text-3xl font-black">{t.eventsTitle}</h2>
+                        <div className="space-y-3 mt-6">
+                            {items.map((item) => (
+                                <div key={item} className="p-4 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">{item}</div>
+                            ))}
+                        </div>
+                    </main>
+                    <BottomNav active="events" />
+                </div>
+            );
+        };
+
+        const OnboardingPage = () => {
+            const navigate = useNavigate();
+            const t = useT();
+            const {
+                uiLanguage,
+                autoDetectEnabled,
+                activeLanguage,
+                setLanguage,
+                toggleAutoDetect,
+                sessionDetectedLanguage
+            } = useLanguage();
+            const getLangLabel = (langId) => {
+                const match = LANG_OPTIONS.find((l) => l.id === langId);
+                return match ? match.label : langId;
+            };
+
+            return (
+                <div className="min-h-screen flex items-center justify-center p-4">
+                    <div className="w-full max-w-[640px] bg-white dark:bg-gray-900 rounded-2xl shadow-xl p-6 border border-gray-200 dark:border-gray-800">
+                        <h2 className="text-2xl font-bold">{t.onboardingTitle}</h2>
+                        <p className="text-sm text-gray-500 mt-1">{t.onboardingSubtitle}</p>
+
+                        <div className="mt-5 p-3 rounded-lg bg-gray-50 dark:bg-gray-800 text-sm">
+                            <div><span className="font-semibold">{t.activeLanguage}:</span> {getLangLabel(activeLanguage)}</div>
+                            <div className="mt-1"><span className="font-semibold">{t.selectedLanguage}:</span> {getLangLabel(uiLanguage)}</div>
+                            {sessionDetectedLanguage && autoDetectEnabled && (
+                                <div className="mt-1 text-primary">Auto-detected this session: {getLangLabel(sessionDetectedLanguage)}</div>
+                            )}
+                        </div>
+
+                        <div className="mt-4 space-y-3">
+                            {LANG_OPTIONS.map((lang) => (
+                                <label key={lang.id} className={`flex items-center gap-3 p-3 border-2 rounded-xl cursor-pointer ${activeLanguage === lang.id ? "border-primary bg-primary/5" : "border-gray-200 dark:border-gray-700"}`}>
+                                    <input type="radio" checked={uiLanguage === lang.id} onChange={() => setLanguage(lang.id)} />
+                                    <span className="font-medium">{lang.label}</span>
+                                    {activeLanguage === lang.id && <span className="text-xs text-primary ml-auto">Active</span>}
+                                </label>
+                            ))}
+                        </div>
+
+                        <label className="mt-5 flex items-center gap-3 p-3 rounded-xl bg-gray-50 dark:bg-gray-800 cursor-pointer">
+                            <input type="checkbox" checked={autoDetectEnabled} onChange={toggleAutoDetect} />
+                            <span className="text-sm">{t.autoDetect}</span>
+                        </label>
+
+                        <button onClick={() => navigate("/")} className="mt-6 w-full h-11 rounded-xl bg-primary text-white font-bold">
+                            {t.confirm}
+                        </button>
+                    </div>
+                </div>
+            );
+        };
+
+        const App = () => {
+            return (
+                <LanguageProvider>
+                    <Routes>
+                        <Route path="/" element={<HomePage />} />
+                        <Route path="/chat" element={<ChatPage />} />
+                        <Route path="/map" element={<MapPage />} />
+                        <Route path="/services" element={<ServicesPage />} />
+                        <Route path="/events" element={<EventsPage />} />
+                        <Route path="/onboarding" element={<OnboardingPage />} />
+                    </Routes>
+                </LanguageProvider>
+            );
+        };
+
+        const root = createRoot(document.getElementById("root"));
+        root.render(
+            <MemoryRouter>
+                <App />
+            </MemoryRouter>
+        );
+    </script>
+</body>
+</html>
