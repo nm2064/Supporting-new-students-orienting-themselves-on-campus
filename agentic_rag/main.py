@@ -13,6 +13,7 @@ from pydantic import BaseModel, Field
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from config import validate_config, KNOWLEDGE_FILE
+from maps.router import router as maps_router
 from rag import get_rag
 
 # Create FastAPI app
@@ -30,6 +31,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Maps endpoints
+app.include_router(maps_router)
 
 # Request/Response models
 class IngestRequest(BaseModel):
@@ -232,6 +236,9 @@ if __name__ == "__main__":
     print("  - GET  /health")
     print("  - POST /ingest")
     print("  - POST /rag-chat")
+    print("  - GET  /api/places")
+    print("  - GET  /api/places/{id}")
+    print("  - POST /api/route")
     print("  - GET  /session/{session_id}")
     print("  - DELETE /session/{session_id}")
     print("")

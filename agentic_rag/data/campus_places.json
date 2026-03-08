@@ -1,0 +1,191 @@
+[
+  {
+    "id": "edin-main-library",
+    "name": "Main Library",
+    "lat": 55.90985,
+    "lng": -3.32015,
+    "campus": "edinburgh",
+    "type": "library",
+    "tags": [
+      "study",
+      "books",
+      "silent"
+    ],
+    "metadata": {
+      "building_code": "LIB"
+    }
+  },
+  {
+    "id": "edin-student-union",
+    "name": "Student Union Building",
+    "lat": 55.90932,
+    "lng": -3.32093,
+    "campus": "edinburgh",
+    "type": "student-services",
+    "tags": [
+      "union",
+      "clubs",
+      "societies"
+    ],
+    "metadata": {
+      "building_code": "SU"
+    }
+  },
+  {
+    "id": "edin-nasmyth",
+    "name": "James Nasmyth Building",
+    "lat": 55.91076,
+    "lng": -3.32277,
+    "campus": "edinburgh",
+    "type": "teaching",
+    "tags": [
+      "lecture",
+      "engineering"
+    ],
+    "metadata": {
+      "building_code": "NAS"
+    }
+  },
+  {
+    "id": "edin-earl-mountbatten",
+    "name": "Earl Mountbatten Building",
+    "lat": 55.91173,
+    "lng": -3.32119,
+    "campus": "edinburgh",
+    "type": "teaching",
+    "tags": [
+      "classrooms",
+      "labs"
+    ],
+    "metadata": {
+      "building_code": "EMB"
+    }
+  },
+  {
+    "id": "edin-grid",
+    "name": "GRID Building",
+    "lat": 55.91007,
+    "lng": -3.31883,
+    "campus": "edinburgh",
+    "type": "innovation",
+    "tags": [
+      "makerspace",
+      "startup",
+      "innovation"
+    ],
+    "metadata": {
+      "building_code": "GRID"
+    }
+  },
+  {
+    "id": "edin-chaplaincy",
+    "name": "Chaplaincy Centre",
+    "lat": 55.90912,
+    "lng": -3.31855,
+    "campus": "edinburgh",
+    "type": "wellbeing",
+    "tags": [
+      "support",
+      "quiet",
+      "multifaith"
+    ],
+    "metadata": {
+      "building_code": "CHAP"
+    }
+  },
+  {
+    "id": "edin-health-centre",
+    "name": "Health and Wellbeing Centre",
+    "lat": 55.90862,
+    "lng": -3.31944,
+    "campus": "edinburgh",
+    "type": "health",
+    "tags": [
+      "medical",
+      "wellbeing",
+      "support"
+    ],
+    "metadata": {
+      "building_code": "HWC"
+    }
+  },
+  {
+    "id": "edin-sports-centre",
+    "name": "Oriam Sports Centre",
+    "lat": 55.91111,
+    "lng": -3.31776,
+    "campus": "edinburgh",
+    "type": "sports",
+    "tags": [
+      "gym",
+      "fitness",
+      "sports"
+    ],
+    "metadata": {
+      "building_code": "ORIAM"
+    }
+  },
+  {
+    "id": "edin-postgrad-centre",
+    "name": "Postgraduate Centre",
+    "lat": 55.90971,
+    "lng": -3.32168,
+    "campus": "edinburgh",
+    "type": "study-space",
+    "tags": [
+      "postgraduate",
+      "study"
+    ],
+    "metadata": {
+      "building_code": "PGC"
+    }
+  },
+  {
+    "id": "edin-accommodation-office",
+    "name": "Accommodation Office",
+    "lat": 55.90891,
+    "lng": -3.32231,
+    "campus": "edinburgh",
+    "type": "accommodation",
+    "tags": [
+      "housing",
+      "residence",
+      "support"
+    ],
+    "metadata": {
+      "building_code": "ACCOM"
+    }
+  },
+  {
+    "id": "edin-careers",
+    "name": "Careers Service",
+    "lat": 55.91028,
+    "lng": -3.32044,
+    "campus": "edinburgh",
+    "type": "careers",
+    "tags": [
+      "jobs",
+      "internships",
+      "cv"
+    ],
+    "metadata": {
+      "building_code": "CAREER"
+    }
+  },
+  {
+    "id": "edin-main-reception",
+    "name": "Main Campus Reception",
+    "lat": 55.91052,
+    "lng": -3.31962,
+    "campus": "edinburgh",
+    "type": "information",
+    "tags": [
+      "helpdesk",
+      "visitor",
+      "information"
+    ],
+    "metadata": {
+      "building_code": "RECEP"
+    }
+  }
+]

@@ -61,6 +61,19 @@ CHROMA_PERSIST_DIR = os.getenv("CHROMA_PERSIST_DIR", os.path.join(BASE_DIR, "chr
 KNOWLEDGE_FILE = os.getenv("KNOWLEDGE_FILE", os.path.join(BASE_DIR, "knowledge.txt"))
 INGEST_STATE_FILE = os.path.join(CHROMA_PERSIST_DIR, "ingest_state.json")
 
+# Maps Configuration
+ORS_API_KEY = os.getenv("ORS_API_KEY", "")
+ORS_BASE_URL = os.getenv("ORS_BASE_URL", "https://api.openrouteservice.org")
+MAP_ROUTE_TIMEOUT_S = float(os.getenv("MAP_ROUTE_TIMEOUT_S", "8"))
+MAP_CACHE_TTL_S = int(os.getenv("MAP_CACHE_TTL_S", "300"))
+MAP_CACHE_MAX_ITEMS = int(os.getenv("MAP_CACHE_MAX_ITEMS", "1000"))
+MAP_RATE_LIMIT_ROUTE_PER_MIN = int(os.getenv("MAP_RATE_LIMIT_ROUTE_PER_MIN", "30"))
+MAP_RATE_LIMIT_PLACES_PER_MIN = int(os.getenv("MAP_RATE_LIMIT_PLACES_PER_MIN", "60"))
+MAP_ENABLE_TRANSLATION_FALLBACK = (
+    os.getenv("MAP_ENABLE_TRANSLATION_FALLBACK", "true").strip().lower() == "true"
+)
+MAPS_DATA_FILE = os.getenv("MAPS_DATA_FILE", os.path.join(BASE_DIR, "data", "campus_places.json"))
+
 # Validate required configuration
 def validate_config():
     """Validate that required configuration is present."""

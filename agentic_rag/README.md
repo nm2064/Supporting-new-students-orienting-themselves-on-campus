@@ -114,6 +114,22 @@ uvicorn main:app --reload --host 0.0.0.0 --port 8000
 | `http://localhost:8000/ingest` | POST | Ingest knowledge file |
 | `http://localhost:8000/rag-chat` | POST | Chat with agentic RAG |
 | `http://localhost:8000/session/{id}` | GET/DELETE | Session management |
+| `http://localhost:8000/api/places?query=...` | GET | Search campus places |
+| `http://localhost:8000/api/places/{id}` | GET | Place details |
+| `http://localhost:8000/api/route` | POST | Walking/cycling/driving route |
+
+## Maps Configuration
+
+Add these settings in `.env` for Maps + Navigation:
+
+```env
+MAPS_DATA_FILE=./data/campus_places.json
+ORS_API_KEY=your-openrouteservice-key
+MAP_ROUTE_TIMEOUT_S=8
+MAP_CACHE_TTL_S=300
+MAP_RATE_LIMIT_ROUTE_PER_MIN=30
+MAP_RATE_LIMIT_PLACES_PER_MIN=60
+```
 
 ## Testing
 

@@ -7,6 +7,10 @@
     <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
     <link href="https://fonts.googleapis.com/css2?family=Lexend:wght@300;400;500;600;700;800;900&family=Noto+Sans+Arabic:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
+    <link
+        rel="stylesheet"
+        href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    />
     <script id="tailwind-config">
         tailwind.config = {
             darkMode: "class",
@@ -29,6 +33,11 @@
         .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
         .hide-scrollbar::-webkit-scrollbar { display: none; }
         .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        .leaflet-container { direction: ltr; }
+        .bottom-sheet { transition: height 220ms ease; }
+        .bottom-sheet.collapsed { height: 130px; }
+        .bottom-sheet.half { height: 45vh; }
+        .bottom-sheet.full { height: 78vh; }
         .map-bg {
             background-image: url(https://lh3.googleusercontent.com/aida-public/AB6AXuAa9by2TvDZcqG7P2yGFuZXOmCJSbigZA0tQTZHPV7i3Q5f7gc3FVZbTxXLT4DV_Xn8BrbpU9hpQBMg2jmSweUs_it20K8RTbAem6Ynx6y5wCfmM2Nth9ktBFgpySFBpfpkxjf7BBYV8PwEjc0jitqfL79cK-J5-S0H5fPKcsiZ9uiyOeiDbWdiozaeWqQB8bCDWXRUNC11dajLUu4DIWjPV9zoJOUqWsyHS_TVcGjCeIaFcbxwy0eEbyCbOLDNm5JRJoUx0D6GWR0);
             background-size: cover;
@@ -44,11 +53,15 @@
     <script src="https://unpkg.com/history@5/umd/history.development.js"></script>
     <script src="https://unpkg.com/react-router@6.3.0/umd/react-router.development.js"></script>
     <script src="https://unpkg.com/react-router-dom@6.3.0/umd/react-router-dom.development.js"></script>
+    <script
+        src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    ></script>
     <script src="https://unpkg.com/babel-standalone@6/babel.min.js"></script>
     <script type="text/babel">
-        const { useEffect, useMemo, useState, useContext, createContext } = React;
+        const { useEffect, useMemo, useState, useContext, createContext, useRef } = React;
         const { createRoot } = ReactDOM;
         const { MemoryRouter, Routes, Route, Link, useNavigate } = ReactRouterDOM;
+        const API_BASE = "http://localhost:8000";
 
         const STORAGE_UI_LANG = "uniAssistant_ui_language";
         const STORAGE_AUTO_DETECT = "uniAssistant_auto_detect_enabled";
@@ -76,6 +89,30 @@
                 quickQuestions: "Quick questions",
                 language: "Language",
                 locationHint: "Main Library • 4 mins walk",
+                mapSearchDestination: "Search destination",
+                mapSearchOrigin: "Search origin",
+                mapEnableLocation: "Enable location",
+                mapLocationDenied: "Location denied. You can still pick origin manually.",
+                mapLocationUnavailable: "Location unavailable on this browser/device.",
+                mapUseMyLocation: "Use my location",
+                mapSelectManualOrigin: "Select origin manually",
+                mapTapMapOrigin: "Tap the map to set origin",
+                mapCurrentLocationLabel: "Current location",
+                mapOriginPin: "Selected origin",
+                mapDestinationLabel: "Destination",
+                mapGetDirections: "Get directions",
+                mapReroute: "Re-route",
+                mapClearRoute: "Clear route",
+                mapDistance: "Distance",
+                mapEta: "ETA",
+                mapSteps: "Steps",
+                mapNoDestination: "Select a destination first.",
+                mapNoOrigin: "Select an origin or enable location.",
+                mapRoutingUnavailable: "Routing temporarily unavailable. You can still view the destination on the map.",
+                mapProfileFoot: "Walk",
+                mapProfileCycling: "Cycle",
+                mapProfileDriving: "Drive",
+                mapNoSteps: "No steps available.",
                 servicesTitle: "Student Services",
                 eventsTitle: "Upcoming Events"
             },
@@ -100,6 +137,30 @@
                 quickQuestions: "快捷问题",
                 language: "语言",
                 locationHint: "主图书馆 • 步行4分钟",
+                mapSearchDestination: "搜索目的地",
+                mapSearchOrigin: "搜索起点",
+                mapEnableLocation: "启用定位",
+                mapLocationDenied: "定位被拒绝。你仍可手动选择起点。",
+                mapLocationUnavailable: "此浏览器/设备不支持定位。",
+                mapUseMyLocation: "使用我的位置",
+                mapSelectManualOrigin: "手动选择起点",
+                mapTapMapOrigin: "点击地图设置起点",
+                mapCurrentLocationLabel: "当前位置",
+                mapOriginPin: "已选起点",
+                mapDestinationLabel: "目的地",
+                mapGetDirections: "获取路线",
+                mapReroute: "重新规划",
+                mapClearRoute: "清除路线",
+                mapDistance: "距离",
+                mapEta: "预计时间",
+                mapSteps: "步骤",
+                mapNoDestination: "请先选择目的地。",
+                mapNoOrigin: "请选择起点或启用定位。",
+                mapRoutingUnavailable: "路线暂时不可用。你仍可在地图上查看目的地。",
+                mapProfileFoot: "步行",
+                mapProfileCycling: "骑行",
+                mapProfileDriving: "驾车",
+                mapNoSteps: "暂无步骤。",
                 servicesTitle: "学生服务",
                 eventsTitle: "近期活动"
             },
@@ -124,6 +185,30 @@
                 quickQuestions: "त्वरित प्रश्न",
                 language: "भाषा",
                 locationHint: "मुख्य पुस्तकालय • 4 मिनट पैदल",
+                mapSearchDestination: "गंतव्य खोजें",
+                mapSearchOrigin: "प्रारंभ बिंदु खोजें",
+                mapEnableLocation: "लोकेशन सक्षम करें",
+                mapLocationDenied: "लोकेशन अस्वीकृत है। आप मैन्युअल रूप से प्रारंभ चुन सकते हैं।",
+                mapLocationUnavailable: "इस ब्राउज़र/डिवाइस पर लोकेशन उपलब्ध नहीं है।",
+                mapUseMyLocation: "मेरी लोकेशन उपयोग करें",
+                mapSelectManualOrigin: "मैन्युअल प्रारंभ चुनें",
+                mapTapMapOrigin: "प्रारंभ सेट करने के लिए मैप पर टैप करें",
+                mapCurrentLocationLabel: "वर्तमान लोकेशन",
+                mapOriginPin: "चयनित प्रारंभ",
+                mapDestinationLabel: "गंतव्य",
+                mapGetDirections: "दिशा प्राप्त करें",
+                mapReroute: "फिर से मार्ग बनाएं",
+                mapClearRoute: "मार्ग साफ करें",
+                mapDistance: "दूरी",
+                mapEta: "अनुमानित समय",
+                mapSteps: "चरण",
+                mapNoDestination: "पहले गंतव्य चुनें।",
+                mapNoOrigin: "प्रारंभ चुनें या लोकेशन सक्षम करें।",
+                mapRoutingUnavailable: "रूटिंग अस्थायी रूप से उपलब्ध नहीं है। आप फिर भी गंतव्य देख सकते हैं।",
+                mapProfileFoot: "पैदल",
+                mapProfileCycling: "साइकिल",
+                mapProfileDriving: "ड्राइव",
+                mapNoSteps: "कोई चरण उपलब्ध नहीं है।",
                 servicesTitle: "छात्र सेवाएँ",
                 eventsTitle: "आगामी कार्यक्रम"
             },
@@ -148,6 +233,30 @@
                 quickQuestions: "أسئلة سريعة",
                 language: "اللغة",
                 locationHint: "المكتبة الرئيسية • 4 دقائق مشيًا",
+                mapSearchDestination: "ابحث عن الوجهة",
+                mapSearchOrigin: "ابحث عن نقطة البداية",
+                mapEnableLocation: "تفعيل الموقع",
+                mapLocationDenied: "تم رفض الموقع. ما زال بإمكانك تحديد نقطة البداية يدويًا.",
+                mapLocationUnavailable: "الموقع غير متاح في هذا المتصفح/الجهاز.",
+                mapUseMyLocation: "استخدام موقعي",
+                mapSelectManualOrigin: "تحديد البداية يدويًا",
+                mapTapMapOrigin: "اضغط على الخريطة لتحديد البداية",
+                mapCurrentLocationLabel: "موقعي الحالي",
+                mapOriginPin: "بداية محددة",
+                mapDestinationLabel: "الوجهة",
+                mapGetDirections: "الحصول على الاتجاهات",
+                mapReroute: "إعادة التوجيه",
+                mapClearRoute: "مسح المسار",
+                mapDistance: "المسافة",
+                mapEta: "الوقت المتوقع",
+                mapSteps: "الخطوات",
+                mapNoDestination: "اختر وجهة أولاً.",
+                mapNoOrigin: "اختر نقطة بداية أو فعّل الموقع.",
+                mapRoutingUnavailable: "التوجيه غير متاح مؤقتًا. لا يزال بإمكانك عرض الوجهة على الخريطة.",
+                mapProfileFoot: "مشي",
+                mapProfileCycling: "دراجة",
+                mapProfileDriving: "سيارة",
+                mapNoSteps: "لا توجد خطوات متاحة.",
                 servicesTitle: "خدمات الطلاب",
                 eventsTitle: "الفعاليات القادمة"
             }
@@ -482,17 +591,453 @@
 
         const MapPage = () => {
             const t = useT();
+            const { activeLanguage } = useLanguage();
+            const mapContainerRef = useRef(null);
+            const mapRef = useRef(null);
+            const destinationMarkerRef = useRef(null);
+            const manualOriginMarkerRef = useRef(null);
+            const currentMarkerRef = useRef(null);
+            const currentAccuracyRef = useRef(null);
+            const routeLayerRef = useRef(null);
+            const originModeRef = useRef("manual");
+
+            const [sheetState, setSheetState] = useState("half");
+            const [searchQuery, setSearchQuery] = useState("");
+            const [searchResults, setSearchResults] = useState([]);
+            const [originSearchQuery, setOriginSearchQuery] = useState("");
+            const [originSearchResults, setOriginSearchResults] = useState([]);
+            const [locationPermission, setLocationPermission] = useState("unknown");
+            const [currentLocation, setCurrentLocation] = useState(null);
+            const [locationAccuracy, setLocationAccuracy] = useState(null);
+            const [originMode, setOriginMode] = useState("manual");
+            const [manualOrigin, setManualOrigin] = useState(null);
+            const [selectedDestination, setSelectedDestination] = useState(null);
+            const [profile, setProfile] = useState("foot");
+            const [route, setRoute] = useState(null);
+            const [loadingRoute, setLoadingRoute] = useState(false);
+            const [routeError, setRouteError] = useState(null);
+            const [leafletReady, setLeafletReady] = useState(!!window.L);
+
+            useEffect(() => {
+                originModeRef.current = originMode;
+            }, [originMode]);
+
+            const localeTag = activeLanguage === "zh-Hans" ? "zh-CN" : activeLanguage;
+            const formatDistance = (meters) => {
+                if (meters >= 1000) {
+                    return `${new Intl.NumberFormat(localeTag, { maximumFractionDigits: 1 }).format(meters / 1000)} km`;
+                }
+                return `${new Intl.NumberFormat(localeTag, { maximumFractionDigits: 0 }).format(meters)} m`;
+            };
+            const formatDuration = (seconds) => {
+                const totalMin = Math.round(seconds / 60);
+                const h = Math.floor(totalMin / 60);
+                const m = totalMin % 60;
+                if (h > 0) return `${h}h ${m}m`;
+                return `${m}m`;
+            };
+
+            useEffect(() => {
+                if (!mapContainerRef.current || mapRef.current || !window.L) return;
+                const map = window.L.map(mapContainerRef.current, { zoomControl: true }).setView([55.90985, -3.32015], 16);
+                window.L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+                    maxZoom: 19,
+                    attribution: "&copy; OpenStreetMap contributors"
+                }).addTo(map);
+
+                map.on("click", (event) => {
+                    if (originModeRef.current !== "manual") return;
+                    const nextOrigin = {
+                        lat: event.latlng.lat,
+                        lng: event.latlng.lng,
+                        name: "Origin"
+                    };
+                    setManualOrigin(nextOrigin);
+                    setOriginSearchQuery(`${nextOrigin.lat.toFixed(5)}, ${nextOrigin.lng.toFixed(5)}`);
+                });
+
+                mapRef.current = map;
+                setLeafletReady(true);
+                setTimeout(() => map.invalidateSize(), 120);
+                return () => map.remove();
+            }, []);
+
+            useEffect(() => {
+                if (!mapRef.current) return;
+                const id = setTimeout(() => mapRef.current && mapRef.current.invalidateSize(), 180);
+                return () => clearTimeout(id);
+            }, [sheetState]);
+
+            useEffect(() => {
+                if (!mapRef.current) return;
+                const onResize = () => mapRef.current && mapRef.current.invalidateSize();
+                window.addEventListener("resize", onResize);
+                return () => window.removeEventListener("resize", onResize);
+            }, []);
+
+            useEffect(() => {
+                if (!selectedDestination || !mapRef.current || !window.L) return;
+                if (destinationMarkerRef.current) destinationMarkerRef.current.remove();
+                destinationMarkerRef.current = window.L.marker(
+                    [selectedDestination.lat, selectedDestination.lng],
+                    { draggable: true }
+                ).addTo(mapRef.current);
+                destinationMarkerRef.current.on("dragend", (event) => {
+                    const next = event.target.getLatLng();
+                    setSelectedDestination((prev) => {
+                        if (!prev) return prev;
+                        return { ...prev, lat: next.lat, lng: next.lng };
+                    });
+                });
+                destinationMarkerRef.current.bindPopup(`${t.mapDestinationLabel}: ${selectedDestination.name}`).openPopup();
+            }, [selectedDestination, activeLanguage]);
+
+            useEffect(() => {
+                if (!mapRef.current || !window.L) return;
+                if (manualOriginMarkerRef.current) {
+                    manualOriginMarkerRef.current.remove();
+                    manualOriginMarkerRef.current = null;
+                }
+                if (originMode === "manual" && manualOrigin) {
+                    manualOriginMarkerRef.current = window.L.marker([manualOrigin.lat, manualOrigin.lng]).addTo(mapRef.current);
+                    manualOriginMarkerRef.current.bindPopup(`${t.mapOriginPin}`).openPopup();
+                }
+            }, [originMode, manualOrigin, activeLanguage]);
+
+            useEffect(() => {
+                if (!mapRef.current || !window.L) return;
+                if (currentMarkerRef.current) currentMarkerRef.current.remove();
+                if (currentAccuracyRef.current) currentAccuracyRef.current.remove();
+                if (currentLocation) {
+                    currentMarkerRef.current = window.L.marker([currentLocation.lat, currentLocation.lng]).addTo(mapRef.current);
+                    currentMarkerRef.current.bindPopup(t.mapCurrentLocationLabel);
+                    if (locationAccuracy) {
+                        currentAccuracyRef.current = window.L.circle([currentLocation.lat, currentLocation.lng], {
+                            radius: locationAccuracy,
+                            weight: 1,
+                            opacity: 0.4,
+                            fillOpacity: 0.12
+                        }).addTo(mapRef.current);
+                    }
+                }
+            }, [currentLocation, locationAccuracy, activeLanguage]);
+
+            useEffect(() => {
+                if (!mapRef.current || !window.L) return;
+                if (routeLayerRef.current) {
+                    routeLayerRef.current.remove();
+                    routeLayerRef.current = null;
+                }
+                if (route && route.geometry && Array.isArray(route.geometry.coordinates)) {
+                    const latlngs = route.geometry.coordinates.map(([lng, lat]) => [lat, lng]);
+                    if (latlngs.length < 2) return;
+                    routeLayerRef.current = window.L.polyline(latlngs, {
+                        color: "#135bec",
+                        weight: 5,
+                        opacity: 0.9
+                    }).addTo(mapRef.current);
+                    mapRef.current.fitBounds(routeLayerRef.current.getBounds(), { padding: [24, 24] });
+                }
+            }, [route]);
+
+            useEffect(() => {
+                const term = searchQuery.trim();
+                if (!term) {
+                    setSearchResults([]);
+                    return;
+                }
+                const timeout = setTimeout(async () => {
+                    try {
+                        const res = await fetch(`${API_BASE}/api/places?query=${encodeURIComponent(term)}`);
+                        if (!res.ok) return;
+                        const data = await res.json();
+                        setSearchResults(Array.isArray(data) ? data : []);
+                    } catch (e) {}
+                }, 250);
+                return () => clearTimeout(timeout);
+            }, [searchQuery]);
+
+            useEffect(() => {
+                const term = originSearchQuery.trim();
+                if (originMode !== "manual" || !term) {
+                    setOriginSearchResults([]);
+                    return;
+                }
+                const timeout = setTimeout(async () => {
+                    try {
+                        const res = await fetch(`${API_BASE}/api/places?query=${encodeURIComponent(term)}`);
+                        if (!res.ok) return;
+                        const data = await res.json();
+                        setOriginSearchResults(Array.isArray(data) ? data : []);
+                    } catch (e) {}
+                }, 250);
+                return () => clearTimeout(timeout);
+            }, [originSearchQuery, originMode]);
+
+            const selectDestination = (place) => {
+                setSelectedDestination(place);
+                setSearchQuery(place.name);
+                setSearchResults([]);
+                if (mapRef.current) mapRef.current.panTo([place.lat, place.lng]);
+            };
+
+            const selectManualOrigin = (place) => {
+                setManualOrigin(place);
+                setOriginSearchQuery(place.name);
+                setOriginSearchResults([]);
+                if (mapRef.current) mapRef.current.panTo([place.lat, place.lng]);
+            };
+
+            const enableLocation = () => {
+                if (!navigator.geolocation) {
+                    setLocationPermission("unavailable");
+                    return;
+                }
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        const nextLocation = {
+                            lat: position.coords.latitude,
+                            lng: position.coords.longitude,
+                            name: t.mapCurrentLocationLabel
+                        };
+                        setLocationPermission("granted");
+                        setCurrentLocation(nextLocation);
+                        setLocationAccuracy(position.coords.accuracy || null);
+                        setOriginMode("gps");
+                        if (mapRef.current) mapRef.current.panTo([nextLocation.lat, nextLocation.lng]);
+                    },
+                    () => {
+                        setLocationPermission("denied");
+                        setOriginMode("manual");
+                    },
+                    { enableHighAccuracy: true, timeout: 12000, maximumAge: 60000 }
+                );
+            };
+
+            const useMyLocationAsOrigin = () => {
+                if (locationPermission === "granted" && currentLocation) {
+                    setOriginMode("gps");
+                    if (mapRef.current) mapRef.current.panTo([currentLocation.lat, currentLocation.lng]);
+                    return;
+                }
+                enableLocation();
+            };
+
+            const requestDirections = async (originOverride = null) => {
+                if (!selectedDestination) {
+                    setRouteError(t.mapNoDestination);
+                    return;
+                }
+                const origin = originOverride || (originMode === "gps" ? currentLocation : manualOrigin);
+                if (!origin) {
+                    setRouteError(t.mapNoOrigin);
+                    return;
+                }
+
+                setLoadingRoute(true);
+                setRouteError(null);
+                try {
+                    const res = await fetch(`${API_BASE}/api/route`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            profile,
+                            origin: { lat: origin.lat, lng: origin.lng },
+                            destination: { lat: selectedDestination.lat, lng: selectedDestination.lng },
+                            locale: activeLanguage
+                        })
+                    });
+                    const data = await res.json();
+                    if (!res.ok) {
+                        setRouteError(data.detail || t.mapRoutingUnavailable);
+                        return;
+                    }
+                    setRoute(data);
+                    setSheetState("full");
+                } catch (e) {
+                    setRouteError(t.mapRoutingUnavailable);
+                } finally {
+                    setLoadingRoute(false);
+                }
+            };
+
+            const reroute = () => {
+                if (locationPermission !== "granted" || !currentLocation) return;
+                setOriginMode("gps");
+                requestDirections(currentLocation);
+            };
+
+            const clearRoute = () => {
+                setRoute(null);
+                setRouteError(null);
+            };
+
             return (
-                <div className="min-h-screen pb-24">
-                    <Header />
-                    <main className="max-w-[960px] mx-auto p-4">
-                        <div className="map-bg rounded-2xl min-h-[420px] relative border border-gray-200">
-                            <div className="absolute bottom-4 start-4 bg-white/95 rounded-xl p-3 shadow text-start">
-                                <div className="font-bold">Main Library</div>
-                                <div className="text-sm text-gray-500">{t.locationHint}</div>
+                <div className="h-screen w-full relative overflow-hidden bg-background-light dark:bg-background-dark">
+                    <div ref={mapContainerRef} className="absolute inset-0" />
+                    <div className="absolute top-4 start-4 z-[500] bg-white/88 dark:bg-gray-900/88 backdrop-blur rounded-2xl p-3 shadow-lg max-w-[300px] border border-white/60 dark:border-gray-700/80">
+                        {locationPermission !== "granted" && (
+                            <button onClick={enableLocation} className="w-full px-3 py-2 text-sm rounded-lg bg-primary text-white">
+                                {t.mapEnableLocation}
+                            </button>
+                        )}
+                        {locationPermission === "denied" && (
+                            <p className="mt-2 text-xs text-amber-700 dark:text-amber-300">{t.mapLocationDenied}</p>
+                        )}
+                        {locationPermission === "unavailable" && (
+                            <p className="mt-2 text-xs text-amber-700 dark:text-amber-300">{t.mapLocationUnavailable}</p>
+                        )}
+                        {!leafletReady && (
+                            <p className="mt-2 text-xs text-red-700 dark:text-red-300">Map engine failed to load. Refresh the page.</p>
+                        )}
+                    </div>
+
+                    <div
+                        dir={activeLanguage === "ar" ? "rtl" : "ltr"}
+                        className={`bottom-sheet ${sheetState} absolute left-0 right-0 bottom-20 z-[500] bg-white/97 dark:bg-gray-900/97 backdrop-blur rounded-t-[28px] border-t border-gray-200 dark:border-gray-800 shadow-2xl flex flex-col`}
+                    >
+                        <div className="px-4 pt-2 pb-3 border-b border-gray-200 dark:border-gray-800">
+                            <div className="mx-auto w-12 h-1.5 rounded-full bg-gray-300 dark:bg-gray-700 mb-3"></div>
+                            <div className="flex items-center justify-between gap-2">
+                                <div className="flex gap-2 text-xs">
+                                    <button onClick={() => setSheetState("collapsed")} className={`px-3 py-1.5 rounded-lg ${sheetState === "collapsed" ? "bg-primary text-white" : "bg-gray-100 dark:bg-gray-800"}`}>Min</button>
+                                    <button onClick={() => setSheetState("half")} className={`px-3 py-1.5 rounded-lg ${sheetState === "half" ? "bg-primary text-white" : "bg-gray-100 dark:bg-gray-800"}`}>Mid</button>
+                                    <button onClick={() => setSheetState("full")} className={`px-3 py-1.5 rounded-lg ${sheetState === "full" ? "bg-primary text-white" : "bg-gray-100 dark:bg-gray-800"}`}>Max</button>
+                                </div>
+                                <div className="flex gap-2">
+                                    <button onClick={clearRoute} className="px-3 py-1.5 text-xs rounded-lg bg-gray-100 dark:bg-gray-800">{t.mapClearRoute}</button>
+                                    {locationPermission === "granted" && route && (
+                                        <button onClick={reroute} className="px-3 py-1.5 text-xs rounded-lg bg-primary text-white">{t.mapReroute}</button>
+                                    )}
+                                </div>
                             </div>
                         </div>
-                    </main>
+
+                        <div className="p-4 overflow-y-auto text-start space-y-4">
+                            <div>
+                                <input
+                                    className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm"
+                                    placeholder={t.mapSearchDestination}
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                />
+                                {searchResults.length > 0 && (
+                                    <div className="mt-2 max-h-32 overflow-y-auto rounded-xl border border-gray-200 dark:border-gray-700">
+                                        {searchResults.map((place) => (
+                                            <button
+                                                key={place.id}
+                                                onClick={() => selectDestination(place)}
+                                                className="w-full text-start px-3 py-2 border-b last:border-b-0 border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800"
+                                            >
+                                                <div className="text-sm font-semibold">{place.name}</div>
+                                                <div className="text-xs text-gray-500">{place.type} • {place.campus}</div>
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="flex gap-2">
+                                <button
+                                    onClick={useMyLocationAsOrigin}
+                                    className={`px-3 py-2 rounded-lg text-sm ${originMode === "gps" ? "bg-primary text-white" : "bg-gray-100 dark:bg-gray-800"}`}
+                                >
+                                    {t.mapUseMyLocation}
+                                </button>
+                                <button
+                                    onClick={() => setOriginMode("manual")}
+                                    className={`px-3 py-2 rounded-lg text-sm ${originMode === "manual" ? "bg-primary text-white" : "bg-gray-100 dark:bg-gray-800"}`}
+                                >
+                                    {t.mapSelectManualOrigin}
+                                </button>
+                            </div>
+
+                            {originMode === "manual" && (
+                                <div>
+                                    <input
+                                        className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm"
+                                        placeholder={t.mapSearchOrigin}
+                                        value={originSearchQuery}
+                                        onChange={(e) => setOriginSearchQuery(e.target.value)}
+                                    />
+                                    <p className="text-xs text-gray-500 mt-1">{t.mapTapMapOrigin}</p>
+                                    {originSearchResults.length > 0 && (
+                                        <div className="mt-2 max-h-28 overflow-y-auto rounded-xl border border-gray-200 dark:border-gray-700">
+                                            {originSearchResults.map((place) => (
+                                                <button
+                                                    key={place.id}
+                                                    onClick={() => selectManualOrigin(place)}
+                                                    className="w-full text-start px-3 py-2 border-b last:border-b-0 border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800"
+                                                >
+                                                    <div className="text-sm font-semibold">{place.name}</div>
+                                                    <div className="text-xs text-gray-500">{place.type} • {place.campus}</div>
+                                                </button>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            <div className="flex gap-2">
+                                {[
+                                    { key: "foot", label: t.mapProfileFoot },
+                                    { key: "cycling", label: t.mapProfileCycling },
+                                    { key: "driving", label: t.mapProfileDriving }
+                                ].map((p) => (
+                                    <button
+                                        key={p.key}
+                                        onClick={() => setProfile(p.key)}
+                                        className={`px-3 py-2 rounded-lg text-sm ${profile === p.key ? "bg-primary text-white" : "bg-gray-100 dark:bg-gray-800"}`}
+                                    >
+                                        {p.label}
+                                    </button>
+                                ))}
+                            </div>
+
+                            <button
+                                onClick={() => requestDirections()}
+                                disabled={loadingRoute}
+                                className="w-full h-11 rounded-xl bg-primary text-white font-semibold disabled:opacity-50"
+                            >
+                                {loadingRoute ? "..." : t.mapGetDirections}
+                            </button>
+
+                            {routeError && <div className="text-sm text-red-600 dark:text-red-400">{routeError}</div>}
+
+                            {route && (
+                                <div className="space-y-3">
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div className="p-3 rounded-xl bg-gray-50 dark:bg-gray-800">
+                                            <div className="text-xs text-gray-500">{t.mapDistance}</div>
+                                            <div className="text-lg font-bold">{formatDistance(route.distance_m)}</div>
+                                        </div>
+                                        <div className="p-3 rounded-xl bg-gray-50 dark:bg-gray-800">
+                                            <div className="text-xs text-gray-500">{t.mapEta}</div>
+                                            <div className="text-lg font-bold">{formatDuration(route.duration_s)}</div>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <div className="font-semibold mb-2">{t.mapSteps}</div>
+                                        {Array.isArray(route.steps) && route.steps.length > 0 ? (
+                                            <div className="space-y-2">
+                                                {route.steps.map((step, idx) => (
+                                                    <div key={idx} className="p-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+                                                        <div className="text-sm">{step.instruction}</div>
+                                                        <div className="text-xs text-gray-500 mt-1">
+                                                            {formatDistance(step.distance_m)} • {formatDuration(step.duration_s)}
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <div className="text-sm text-gray-500">{t.mapNoSteps}</div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
                     <BottomNav active="map" />
                 </div>
             );
