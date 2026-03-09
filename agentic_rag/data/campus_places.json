@@ -2,190 +2,171 @@
   {
     "id": "edin-main-library",
     "name": "Main Library",
-    "lat": 55.90985,
-    "lng": -3.32015,
+    "lat": 55.91010,
+    "lng": -3.32100,
     "campus": "edinburgh",
     "type": "library",
-    "tags": [
-      "study",
-      "books",
-      "silent"
-    ],
-    "metadata": {
-      "building_code": "LIB"
-    }
+    "tags": ["study", "books", "silent"],
+    "metadata": { "building_code": "LIB" }
   },
   {
     "id": "edin-student-union",
     "name": "Student Union Building",
-    "lat": 55.90932,
-    "lng": -3.32093,
+    "lat": 55.90925,
+    "lng": -3.32190,
     "campus": "edinburgh",
     "type": "student-services",
-    "tags": [
-      "union",
-      "clubs",
-      "societies"
-    ],
-    "metadata": {
-      "building_code": "SU"
-    }
+    "tags": ["union", "clubs", "societies"],
+    "metadata": { "building_code": "SU" }
   },
   {
     "id": "edin-nasmyth",
     "name": "James Nasmyth Building",
-    "lat": 55.91076,
-    "lng": -3.32277,
+    "lat": 55.91115,
+    "lng": -3.32180,
     "campus": "edinburgh",
     "type": "teaching",
-    "tags": [
-      "lecture",
-      "engineering"
-    ],
-    "metadata": {
-      "building_code": "NAS"
-    }
+    "tags": ["lecture", "engineering"],
+    "metadata": { "building_code": "NAS" }
   },
   {
     "id": "edin-earl-mountbatten",
     "name": "Earl Mountbatten Building",
-    "lat": 55.91173,
-    "lng": -3.32119,
+    "lat": 55.91241,
+    "lng": -3.31727,
     "campus": "edinburgh",
     "type": "teaching",
-    "tags": [
-      "classrooms",
-      "labs"
-    ],
-    "metadata": {
-      "building_code": "EMB"
-    }
+    "tags": ["classrooms", "labs", "electrical engineering"],
+    "metadata": { "building_code": "EMB" }
   },
   {
     "id": "edin-grid",
     "name": "GRID Building",
-    "lat": 55.91007,
-    "lng": -3.31883,
+    "lat": 55.91160,
+    "lng": -3.31920,
     "campus": "edinburgh",
     "type": "innovation",
-    "tags": [
-      "makerspace",
-      "startup",
-      "innovation"
-    ],
-    "metadata": {
-      "building_code": "GRID"
-    }
+    "tags": ["makerspace", "startup", "innovation"],
+    "metadata": { "building_code": "GRID" }
   },
   {
     "id": "edin-chaplaincy",
     "name": "Chaplaincy Centre",
-    "lat": 55.90912,
-    "lng": -3.31855,
+    "lat": 55.90945,
+    "lng": -3.31920,
     "campus": "edinburgh",
     "type": "wellbeing",
-    "tags": [
-      "support",
-      "quiet",
-      "multifaith"
-    ],
-    "metadata": {
-      "building_code": "CHAP"
-    }
+    "tags": ["support", "quiet", "multifaith"],
+    "metadata": { "building_code": "CHAP" }
   },
   {
     "id": "edin-health-centre",
     "name": "Health and Wellbeing Centre",
-    "lat": 55.90862,
-    "lng": -3.31944,
+    "lat": 55.90880,
+    "lng": -3.31980,
     "campus": "edinburgh",
     "type": "health",
-    "tags": [
-      "medical",
-      "wellbeing",
-      "support"
-    ],
-    "metadata": {
-      "building_code": "HWC"
-    }
+    "tags": ["medical", "wellbeing", "support"],
+    "metadata": { "building_code": "HWC" }
   },
   {
     "id": "edin-sports-centre",
     "name": "Oriam Sports Centre",
-    "lat": 55.91111,
-    "lng": -3.31776,
+    "lat": 55.90543,
+    "lng": -3.31873,
     "campus": "edinburgh",
     "type": "sports",
-    "tags": [
-      "gym",
-      "fitness",
-      "sports"
-    ],
-    "metadata": {
-      "building_code": "ORIAM"
-    }
+    "tags": ["gym", "fitness", "sports", "oriam"],
+    "metadata": { "building_code": "ORIAM" }
   },
   {
     "id": "edin-postgrad-centre",
     "name": "Postgraduate Centre",
-    "lat": 55.90971,
-    "lng": -3.32168,
+    "lat": 55.90990,
+    "lng": -3.32120,
     "campus": "edinburgh",
     "type": "study-space",
-    "tags": [
-      "postgraduate",
-      "study"
-    ],
-    "metadata": {
-      "building_code": "PGC"
-    }
+    "tags": ["postgraduate", "study"],
+    "metadata": { "building_code": "PGC" }
   },
   {
     "id": "edin-accommodation-office",
     "name": "Accommodation Office",
-    "lat": 55.90891,
-    "lng": -3.32231,
+    "lat": 55.90920,
+    "lng": -3.32150,
     "campus": "edinburgh",
     "type": "accommodation",
-    "tags": [
-      "housing",
-      "residence",
-      "support"
-    ],
-    "metadata": {
-      "building_code": "ACCOM"
-    }
+    "tags": ["housing", "residence", "support"],
+    "metadata": { "building_code": "ACCOM" }
   },
   {
     "id": "edin-careers",
     "name": "Careers Service",
-    "lat": 55.91028,
-    "lng": -3.32044,
+    "lat": 55.91050,
+    "lng": -3.32000,
     "campus": "edinburgh",
     "type": "careers",
-    "tags": [
-      "jobs",
-      "internships",
-      "cv"
-    ],
-    "metadata": {
-      "building_code": "CAREER"
-    }
+    "tags": ["jobs", "internships", "cv"],
+    "metadata": { "building_code": "CAREER" }
   },
   {
     "id": "edin-main-reception",
     "name": "Main Campus Reception",
-    "lat": 55.91052,
-    "lng": -3.31962,
+    "lat": 55.91060,
+    "lng": -3.31960,
     "campus": "edinburgh",
     "type": "information",
-    "tags": [
-      "helpdesk",
-      "visitor",
-      "information"
-    ],
-    "metadata": {
-      "building_code": "RECEP"
-    }
+    "tags": ["helpdesk", "visitor", "information"],
+    "metadata": { "building_code": "RECEP" }
+  },
+  {
+    "id": "edin-heart-campus",
+    "name": "The Heart (Campus Hub)",
+    "lat": 55.90980,
+    "lng": -3.32045,
+    "campus": "edinburgh",
+    "type": "student-services",
+    "tags": ["coffee", "food", "social", "hub"],
+    "metadata": { "building_code": "HEART" }
+  },
+  {
+    "id": "edin-hugh-nisbet",
+    "name": "Hugh Nisbet Building",
+    "lat": 55.91040,
+    "lng": -3.31830,
+    "campus": "edinburgh",
+    "type": "teaching",
+    "tags": ["lecture", "computing", "maths"],
+    "metadata": { "building_code": "HNB" }
+  },
+  {
+    "id": "edin-david-brewster",
+    "name": "David Brewster Building",
+    "lat": 55.91090,
+    "lng": -3.31850,
+    "campus": "edinburgh",
+    "type": "teaching",
+    "tags": ["lecture", "physics", "chemistry"],
+    "metadata": { "building_code": "DB" }
+  },
+  {
+    "id": "edin-robin-jones",
+    "name": "Robin Jones Building",
+    "lat": 55.91140,
+    "lng": -3.31750,
+    "campus": "edinburgh",
+    "type": "teaching",
+    "tags": ["textiles", "design"],
+    "metadata": { "building_code": "RJ" }
+  },
+  {
+    "id": "edin-lord-balerno",
+    "name": "Lord Balerno Building",
+    "lat": 55.91080,
+    "lng": -3.32050,
+    "campus": "edinburgh",
+    "type": "teaching",
+    "tags": ["lecture", "business"],
+    "metadata": { "building_code": "LB" }
   }
 ]
