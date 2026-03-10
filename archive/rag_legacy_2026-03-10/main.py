@@ -14,9 +14,9 @@ import os
 # Load environment variables (e.g. GOOGLE_API_KEY)
 load_dotenv()
 
-# HARD-CODED API KEY FOR LOCAL DEV ONLY.
-# Replace the placeholder string with your real Gemini key and DO NOT commit it.
-# Set GOOGLE_API_KEY in your environment or local .env file.
+if not os.getenv("GOOGLE_API_KEY"):
+    raise RuntimeError("GOOGLE_API_KEY must be set in the environment to run this experimental backend.")
+
 PERSIST_DIR = "db/chroma_db"
 
 
@@ -102,4 +102,3 @@ If you can't find the answer in the documents, say:
 @app.get("/health")
 async def health():
     return {"status": "ok"}
-

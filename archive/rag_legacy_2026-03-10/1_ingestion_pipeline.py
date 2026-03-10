@@ -8,9 +8,9 @@ from dotenv import load_dotenv
 # Load environment variables (e.g. GOOGLE_API_KEY)
 load_dotenv()
 
-# HARD-CODED API KEY FOR LOCAL DEV ONLY.
-# Replace the placeholder string with your real Gemini key and DO NOT commit it.
-# Set GOOGLE_API_KEY in your environment or local .env file.
+if not os.getenv("GOOGLE_API_KEY"):
+    raise RuntimeError("GOOGLE_API_KEY must be set in the environment to run this ingestion pipeline.")
+
 def load_documents(docs_path="docs"):
     """Load all text files from the docs directory"""
     print(f"Loading documents from {docs_path}...")
@@ -154,4 +154,3 @@ if __name__ == "__main__":
 #        metadata={'source': 'docs/tesla.txt'}
 #    )
 # ]
-
