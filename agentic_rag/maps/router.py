@@ -1,33 +1,33 @@
 """FastAPI router for maps places and routing endpoints."""
+
 from __future__ import annotations
 
-import json
 import logging
 import time
 from datetime import datetime, timezone
+from functools import lru_cache
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
-import config as app_config
-
+from ..logging_utils import log_event
+from ..settings import get_settings
 from .cache import TTLCache
 from .models import PlaceDetail, PlaceSummary, RouteRequest, RouteResponse
 from .places_store import PlacesStore
 from .providers.openrouteservice_provider import OpenRouteServiceProvider
 from .rate_limit import FixedWindowRateLimiter, client_ip
-from .service import MapsService, NoopInstructionTranslator, OpenAIInstructionTranslator, RoutingUnavailable
+from .service import (
+    MapsService,
+    NoopInstructionTranslator,
+    OpenAIInstructionTranslator,
+    RoutingUnavailable,
+)
 
-logger = logging.getLogger("maps")
-logger.setLevel(logging.INFO)
+logger = logging.getLogger("agentic_rag.maps.router")
 
 router = APIRouter(prefix="/api", tags=["maps"])
 
-_maps_service: MapsService | None = None
 _rate_limiter = FixedWindowRateLimiter()
-
-
-def _cfg(name: str, default):
-    return getattr(app_config, name, default)
 
 
 def _log_route(
@@ -40,47 +40,45 @@ def _log_route(
     cache_hit: bool,
     error_code: str | None,
 ) -> None:
-    payload = {
-        "event": "route_request",
-        "ts": datetime.now(timezone.utc).isoformat(),
-        "ip": ip,
-        "profile": profile,
-        "locale": locale,
-        "provider": provider,
-        "latency_ms": latency_ms,
-        "cache_hit": cache_hit,
-        "error_code": error_code,
-    }
-    logger.info(json.dumps(payload, ensure_ascii=False))
-
-
-def get_maps_service() -> MapsService:
-    global _maps_service
-    if _maps_service is not None:
-        return _maps_service
-
-    places_store = PlacesStore(_cfg("MAPS_DATA_FILE", "agentic_rag/data/campus_places.json"))
-    provider = OpenRouteServiceProvider(
-        api_key=_cfg("ORS_API_KEY", ""),
-        base_url=_cfg("ORS_BASE_URL", "https://api.openrouteservice.org"),
+    log_event(
+        logger,
+        "route_request",
+        ts=datetime.now(timezone.utc).isoformat(),
+        ip=ip,
+        profile=profile,
+        locale=locale,
+        provider=provider,
+        latency_ms=latency_ms,
+        cache_hit=cache_hit,
+        error_code=error_code,
     )
+
+
+@lru_cache(maxsize=1)
+def get_maps_service() -> MapsService:
+    settings = get_settings()
     translator = (
         OpenAIInstructionTranslator()
-        if _cfg("MAP_ENABLE_TRANSLATION_FALLBACK", True)
+        if settings.map_enable_translation_fallback
         else NoopInstructionTranslator()
     )
-    cache = TTLCache[RouteResponse](
-        ttl_s=int(_cfg("MAP_CACHE_TTL_S", 300)),
-        max_items=int(_cfg("MAP_CACHE_MAX_ITEMS", 1000)),
-    )
-    _maps_service = MapsService(
-        places_store=places_store,
-        provider=provider,
-        cache=cache,
-        timeout_s=float(_cfg("MAP_ROUTE_TIMEOUT_S", 8)),
+    return MapsService(
+        places_store=PlacesStore(str(settings.maps_data_file)),
+        provider=OpenRouteServiceProvider(
+            api_key=settings.ors_api_key,
+            base_url=settings.ors_base_url,
+        ),
+        cache=TTLCache[RouteResponse](
+            ttl_s=settings.map_cache_ttl_s,
+            max_items=settings.map_cache_max_items,
+        ),
+        timeout_s=settings.map_route_timeout_s,
         translator=translator,
     )
-    return _maps_service
+
+
+def reset_maps_service_cache() -> None:
+    get_maps_service.cache_clear()
 
 
 def _enforce_rate_limit(request: Request, key: str, limit: int) -> str:
@@ -102,10 +100,11 @@ async def search_places(
     campus: str | None = Query(default=None),
     service: MapsService = Depends(get_maps_service),
 ):
+    settings = get_settings()
     _enforce_rate_limit(
         request,
         key="places",
-        limit=int(_cfg("MAP_RATE_LIMIT_PLACES_PER_MIN", 60)),
+        limit=settings.map_rate_limit_places_per_min,
     )
     return service.search_places(query=query, campus=campus)
 
@@ -116,10 +115,11 @@ async def get_place(
     request: Request,
     service: MapsService = Depends(get_maps_service),
 ):
+    settings = get_settings()
     _enforce_rate_limit(
         request,
         key="places",
-        limit=int(_cfg("MAP_RATE_LIMIT_PLACES_PER_MIN", 60)),
+        limit=settings.map_rate_limit_places_per_min,
     )
     place = service.get_place(place_id)
     if place is None:
@@ -133,10 +133,11 @@ async def get_route(
     request: Request,
     service: MapsService = Depends(get_maps_service),
 ):
+    settings = get_settings()
     ip = _enforce_rate_limit(
         request,
         key="route",
-        limit=int(_cfg("MAP_RATE_LIMIT_ROUTE_PER_MIN", 30)),
+        limit=settings.map_rate_limit_route_per_min,
     )
     started = time.perf_counter()
 
@@ -152,22 +153,22 @@ async def get_route(
             error_code=None,
         )
         return response
-    except RoutingUnavailable as exc:
+    except RoutingUnavailable as error:
         _log_route(
             ip=ip,
             profile=route_request.profile.value,
             locale=route_request.locale.value,
-            provider=exc.provider,
+            provider=error.provider,
             latency_ms=int((time.perf_counter() - started) * 1000),
             cache_hit=False,
-            error_code=exc.reason,
+            error_code=error.reason,
         )
         detail = (
             "Routing temporarily unavailable. "
             "You can still view the destination on the map."
         )
-        if exc.reason == "provider_error":
-            provider_detail = (exc.detail or "").lower()
+        if error.reason == "provider_error":
+            provider_detail = (error.detail or "").lower()
             if "missing ors_api_key" in provider_detail:
                 detail = (
                     "Routing is unavailable: OpenRouteService key is missing or still set to a placeholder. "
@@ -178,4 +179,4 @@ async def get_route(
                     "Routing is unavailable: OpenRouteService rejected the API key (401/403). "
                     "Check ORS_API_KEY in agentic_rag/.env and restart the backend."
                 )
-        raise HTTPException(status_code=503, detail=detail) from exc
+        raise HTTPException(status_code=503, detail=detail) from error

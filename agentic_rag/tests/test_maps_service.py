@@ -1,10 +1,18 @@
 import asyncio
-import json
+from pathlib import Path
 
-from maps.cache import TTLCache
-from maps.models import Coord, Locale, Profile, RouteGeometry, RouteRequest, RouteResponse, RouteStep
-from maps.places_store import PlacesStore
-from maps.service import MapsService
+from agentic_rag.maps.cache import TTLCache
+from agentic_rag.maps.models import (
+    Coord,
+    Locale,
+    Profile,
+    RouteGeometry,
+    RouteRequest,
+    RouteResponse,
+    RouteStep,
+)
+from agentic_rag.maps.places_store import PlacesStore
+from agentic_rag.maps.service import MapsService
 
 
 class FakeProvider:
@@ -39,30 +47,11 @@ class SpyTranslator:
         ]
 
 
-def _write_places(tmp_path):
-    path = tmp_path / "places.json"
-    path.write_text(
-        json.dumps(
-            [
-                {
-                    "id": "lib",
-                    "name": "Library",
-                    "lat": 55.9,
-                    "lng": -3.3,
-                    "campus": "edinburgh",
-                    "type": "library",
-                    "tags": ["study"],
-                    "metadata": {},
-                }
-            ]
-        ),
-        encoding="utf-8",
-    )
-    return path
+FIXTURE_PATH = Path(__file__).resolve().parent / "places_fixture.json"
 
 
-def test_maps_service_cache_and_translation(tmp_path):
-    dataset = _write_places(tmp_path)
+def test_maps_service_cache_and_translation():
+    dataset = FIXTURE_PATH
     provider = FakeProvider()
     translator = SpyTranslator()
     service = MapsService(

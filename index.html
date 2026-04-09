@@ -29,20 +29,94 @@
         }
     </script>
     <style>
+        html, body, #root { height: 100%; margin: 0; }
         body { font-family: 'Lexend', sans-serif; }
         .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
         .hide-scrollbar::-webkit-scrollbar { display: none; }
         .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-        .leaflet-container { direction: ltr; }
-        .bottom-sheet { transition: height 220ms ease; }
-        .bottom-sheet.collapsed { height: 130px; }
-        .bottom-sheet.half { height: 45vh; }
-        .bottom-sheet.full { height: 78vh; }
-        .map-bg {
-            background-image: url(https://lh3.googleusercontent.com/aida-public/AB6AXuAa9by2TvDZcqG7P2yGFuZXOmCJSbigZA0tQTZHPV7i3Q5f7gc3FVZbTxXLT4DV_Xn8BrbpU9hpQBMg2jmSweUs_it20K8RTbAem6Ynx6y5wCfmM2Nth9ktBFgpySFBpfpkxjf7BBYV8PwEjc0jitqfL79cK-J5-S0H5fPKcsiZ9uiyOeiDbWdiozaeWqQB8bCDWXRUNC11dajLUu4DIWjPV9zoJOUqWsyHS_TVcGjCeIaFcbxwy0eEbyCbOLDNm5JRJoUx0D6GWR0);
-            background-size: cover;
-            background-position: center;
+
+        /* Map */
+        .map-root { position: fixed; inset: 0; display: flex; flex-direction: column; }
+        .map-body { flex: 1; position: relative; display: flex; }
+        .map-canvas { flex: 1; position: relative; }
+        #map-el { position: absolute; inset: 0; }
+
+        /* Leaflet */
+        .leaflet-container { direction: ltr; font-family: 'Lexend', sans-serif; }
+        .leaflet-control-zoom { border: none !important; box-shadow: 0 2px 12px rgba(0,0,0,.15) !important; border-radius: 14px !important; overflow: hidden; }
+        .leaflet-control-zoom a { width: 40px !important; height: 40px !important; line-height: 40px !important; font-size: 18px !important; border-bottom: 1px solid #f0f0f0 !important; }
+        .leaflet-popup-content-wrapper { border-radius: 14px !important; box-shadow: 0 4px 24px rgba(0,0,0,.15) !important; font-family: 'Lexend', sans-serif !important; }
+        .leaflet-popup-tip { display: none !important; }
+
+        /* Side panel */
+        .map-panel {
+            width: 340px; flex-shrink: 0;
+            display: flex; flex-direction: column;
+            background: rgba(255,255,255,0.92);
+            backdrop-filter: blur(20px) saturate(180%);
+            -webkit-backdrop-filter: blur(20px) saturate(180%);
+            border-right: 1px solid rgba(0,0,0,0.06);
+            box-shadow: 2px 0 20px rgba(0,0,0,.06);
+            overflow-y: auto; overflow-x: hidden; z-index: 10;
         }
+
+        /* FABs */
+        .map-fab {
+            width: 44px; height: 44px; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,.18);
+            cursor: pointer; border: none; outline: none;
+            transition: transform .12s, box-shadow .12s;
+        }
+        .map-fab:active { transform: scale(.9); }
+
+        /* Search input */
+        .map-search-input {
+            flex: 1; border: none; outline: none; background: transparent;
+            font-size: 14px; font-family: 'Lexend', sans-serif; color: #111827;
+            appearance: none; -webkit-appearance: none;
+            box-shadow: none; border-radius: 0;
+        }
+        .map-search-input::placeholder { color: #9ca3af; }
+        .map-search-input:focus,
+        .map-search-input:focus-visible,
+        .map-search-input:active {
+            outline: none;
+            border: none;
+            box-shadow: none;
+        }
+
+        /* Transport pills */
+        .transport-pill {
+            display: flex; align-items: center; gap: 6px;
+            padding: 8px 14px; border-radius: 50px;
+            border: 1.5px solid #e5e7eb; cursor: pointer;
+            background: #fff;
+            font-family: 'Lexend', sans-serif; font-size: 12px; font-weight: 600;
+            color: #6b7280; transition: all .15s; white-space: nowrap;
+        }
+        .transport-pill.active { background: #eef2ff; border-color: #135bec; color: #135bec; }
+
+        /* Chip */
+        .map-chip {
+            display: inline-flex; align-items: center; gap: 5px;
+            padding: 7px 14px; border-radius: 50px; border: none; cursor: pointer;
+            font-family: 'Lexend', sans-serif; font-size: 12px; font-weight: 600;
+            transition: opacity .15s;
+        }
+
+        /* Nav HUD */
+        .nav-hud {
+            position: absolute; top: 14px; left: 14px; right: 14px; z-index: 500;
+            background: rgba(19, 91, 236, 0.95);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border-radius: 20px;
+            box-shadow: 0 4px 20px rgba(19,91,236,.35);
+            padding: 14px 18px; color: #fff;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
     </style>
 </head>
 <body class="bg-background-light dark:bg-background-dark text-[#111318] dark:text-white">
@@ -283,15 +357,15 @@
         const readStoredAutoDetect = () => {
             try {
                 const value = localStorage.getItem(STORAGE_AUTO_DETECT);
-                return value === null ? true : value === "true";
+                return value === null ? false : value === "true";
             } catch (e) {
-                return true;
+                return false;
             }
         };
 
         const LanguageProvider = ({ children }) => {
             const [uiLanguage, setUiLanguage] = useState(readStoredLang);
-            const [autoDetectEnabled, setAutoDetectEnabled] = useState(readStoredAutoDetect);
+            const [autoDetectEnabled, setAutoDetectEnabled] = useState(readStoredAutoDetect); // default false: respect explicit language selection
             const [sessionDetectedLanguage, setSessionDetectedLanguageState] = useState(null);
 
             const activeLanguage = autoDetectEnabled && sessionDetectedLanguage
@@ -362,10 +436,10 @@
                 { id: "events", icon: "event", label: t.navEvents, path: "/events" },
             ];
             return (
-                <nav className="fixed bottom-0 left-0 right-0 bg-white/95 dark:bg-background-dark/95 backdrop-blur border-t border-gray-200 dark:border-gray-800 px-2 py-2 z-50">
+                <nav className="fixed bottom-0 left-0 right-0 bg-white/80 dark:bg-background-dark/80 backdrop-blur-xl border-t border-gray-200/50 dark:border-gray-800/50 px-2 py-1 z-[600]">
                     <div className="max-w-[640px] mx-auto flex items-center justify-around">
                         {items.map((item) => (
-                            <Link key={item.id} to={item.path} className={`flex flex-col items-center gap-1 p-2 ${active === item.id ? "text-primary" : "text-gray-500"}`}>
+                            <Link key={item.id} to={item.path} className={`flex flex-col items-center gap-0.5 px-2 py-1 ${active === item.id ? "text-primary" : "text-gray-500"}`}>
                                 <span className="material-symbols-outlined">{item.icon}</span>
                                 <span className="text-[11px] font-semibold">{item.label}</span>
                             </Link>
@@ -428,16 +502,44 @@
             );
         };
 
+        const STORAGE_CHAT_MESSAGES = "unibot_chat_messages";
+        const STORAGE_CHAT_FOLLOWUPS = "unibot_chat_followups";
+
         const ChatPage = () => {
             const t = useT();
             const { uiLanguage, autoDetectEnabled, setSessionDetectedLanguage } = useLanguage();
-            const [messages, setMessages] = useState([{ role: "assistant", text: t.assistantIntro }]);
+
+            const [messages, setMessages] = useState(() => {
+                try {
+                    const stored = localStorage.getItem(STORAGE_CHAT_MESSAGES);
+                    if (stored) {
+                        const parsed = JSON.parse(stored);
+                        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+                    }
+                } catch (e) {}
+                return [{ role: "assistant", text: t.assistantIntro }];
+            });
+
             const [input, setInput] = useState("");
             const [loading, setLoading] = useState(false);
-            const [followUps, setFollowUps] = useState([]);
+            const [followUps, setFollowUps] = useState(() => {
+                try {
+                    const stored = localStorage.getItem(STORAGE_CHAT_FOLLOWUPS);
+                    if (stored) return JSON.parse(stored);
+                } catch (e) {}
+                return [];
+            });
             const [lastEffectiveLanguage, setLastEffectiveLanguage] = useState(null);
             const [lastConfidence, setLastConfidence] = useState(null);
             const [expandedCitations, setExpandedCitations] = useState({});
+
+            useEffect(() => {
+                try { localStorage.setItem(STORAGE_CHAT_MESSAGES, JSON.stringify(messages)); } catch (e) {}
+            }, [messages]);
+
+            useEffect(() => {
+                try { localStorage.setItem(STORAGE_CHAT_FOLLOWUPS, JSON.stringify(followUps)); } catch (e) {}
+            }, [followUps]);
 
             useEffect(() => {
                 setMessages((prev) => {
@@ -478,20 +580,22 @@
                     if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
                     const data = await res.json();
-                    const answer = data.answer_markdown || data.answer || "No answer returned.";
+                    const answer = typeof data.answer_markdown === "string" && data.answer_markdown.trim()
+                        ? data.answer_markdown
+                        : (typeof data.answer === "string" && data.answer.trim() ? data.answer : "");
+                    const clarifyingQuestion = typeof data.clarifying_question === "string" && data.clarifying_question.trim()
+                        ? data.clarifying_question
+                        : "";
+                    const assistantText = answer || clarifyingQuestion;
                     const citations = Array.isArray(data.citations) ? data.citations : (data.sources || []);
 
                     setMessages((prev) => [...prev, {
                         role: "assistant",
-                        text: answer,
-                        citations,
+                        text: assistantText || "Sorry, I didn't receive a response. Please try again.",
+                        citations: answer ? citations : [],
                         needsHumanHandoff: !!data.needs_human_handoff,
-                        clarifyingQuestion: data.clarifying_question || null,
+                        clarifyingQuestion: clarifyingQuestion || null,
                     }]);
-
-                    if (data.clarifying_question) {
-                        setMessages((prev) => [...prev, { role: "assistant", text: data.clarifying_question }]);
-                    }
 
                     setFollowUps(Array.isArray(data.follow_up_suggestions) ? data.follow_up_suggestions : []);
                     setLastEffectiveLanguage(data.effective_language || null);
@@ -508,14 +612,19 @@
             };
 
             const clearChat = () => {
-                setMessages([{ role: "assistant", text: t.assistantIntro }]);
+                const initial = [{ role: "assistant", text: t.assistantIntro }];
+                setMessages(initial);
                 setFollowUps([]);
-                localStorage.removeItem("unibot_conversation_id");
+                try {
+                    localStorage.removeItem("unibot_conversation_id");
+                    localStorage.setItem(STORAGE_CHAT_MESSAGES, JSON.stringify(initial));
+                    localStorage.removeItem(STORAGE_CHAT_FOLLOWUPS);
+                } catch (e) {}
             };
 
             return (
-                <div className="bg-background-light dark:bg-background-dark font-display flex justify-center min-h-screen pb-24">
-                    <div className="relative w-full max-w-[520px] bg-white dark:bg-gray-900 shadow-2xl flex flex-col h-screen overflow-hidden border-x border-gray-100 dark:border-gray-800">
+                <div className="bg-background-light dark:bg-background-dark font-display flex justify-center h-[100dvh] overflow-hidden">
+                    <div className="relative w-full max-w-[520px] bg-white dark:bg-gray-900 flex h-full flex-col overflow-hidden pb-16">
                         <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-gray-800 bg-white/95 dark:bg-gray-900/95">
                             <div>
                                 <h2 className="font-bold">UniBot</h2>
@@ -572,7 +681,8 @@
                         <div className="p-4 border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
                             <div className="flex items-center gap-2 bg-gray-100 dark:bg-gray-800 rounded-2xl px-3 py-2">
                                 <input
-                                    className="flex-1 bg-transparent outline-none text-sm"
+                                    className="flex-1 appearance-none border-0 bg-transparent px-1 py-2 text-sm outline-none shadow-none ring-0 focus:border-0 focus:outline-none focus:ring-0 focus:ring-transparent focus:ring-offset-0 focus:shadow-none"
+                                    style={{ boxShadow: "none" }}
                                     value={input}
                                     onChange={(e) => setInput(e.target.value)}
                                     onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); sendMessage(); }}}
@@ -601,7 +711,6 @@
             const routeLayerRef = useRef(null);
             const originModeRef = useRef("manual");
 
-            const [sheetState, setSheetState] = useState("half");
             const [searchQuery, setSearchQuery] = useState("");
             const [searchResults, setSearchResults] = useState([]);
             const [originSearchQuery, setOriginSearchQuery] = useState("");
@@ -639,11 +748,20 @@
 
             useEffect(() => {
                 if (!mapContainerRef.current || mapRef.current || !window.L) return;
-                const map = window.L.map(mapContainerRef.current, { zoomControl: true }).setView([55.90985, -3.32015], 16);
-                window.L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+                const map = window.L.map(mapContainerRef.current, {
+                    zoomControl: false,   /* we place zoom ourselves below */
+                    preferCanvas: true,   /* faster rendering */
+                }).setView([55.90985, -3.32015], 16);
+
+                window.L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png", {
                     maxZoom: 19,
-                    attribution: "&copy; OpenStreetMap contributors"
+                    keepBuffer: 2,          /* balance memory vs preload */
+                    updateWhenIdle: false,   /* update while panning */
+                    attribution: "&copy; <a href=\"https://www.openstreetmap.org/copyright\">OSM</a> &copy; <a href=\"https://carto.com/\">CARTO</a>"
                 }).addTo(map);
+
+                /* Re-add zoom in a better position */
+                window.L.control.zoom({ position: "bottomright" }).addTo(map);
 
                 map.on("click", (event) => {
                     if (originModeRef.current !== "manual") return;
@@ -658,15 +776,11 @@
 
                 mapRef.current = map;
                 setLeafletReady(true);
-                setTimeout(() => map.invalidateSize(), 120);
+                /* Let DOM settle then size */
+                requestAnimationFrame(() => { map.invalidateSize(); });
                 return () => map.remove();
             }, []);
 
-            useEffect(() => {
-                if (!mapRef.current) return;
-                const id = setTimeout(() => mapRef.current && mapRef.current.invalidateSize(), 180);
-                return () => clearTimeout(id);
-            }, [sheetState]);
 
             useEffect(() => {
                 if (!mapRef.current) return;
@@ -853,7 +967,6 @@
                         return;
                     }
                     setRoute(data);
-                    setSheetState("full");
                 } catch (e) {
                     setRouteError(t.mapRoutingUnavailable);
                 } finally {
@@ -872,170 +985,342 @@
                 setRouteError(null);
             };
 
-            return (
-                <div className="h-screen w-full relative overflow-hidden bg-background-light dark:bg-background-dark">
-                    <div ref={mapContainerRef} className="absolute inset-0" />
-                    <div className="absolute top-4 start-4 z-[500] bg-white/88 dark:bg-gray-900/88 backdrop-blur rounded-2xl p-3 shadow-lg max-w-[300px] border border-white/60 dark:border-gray-700/80">
-                        {locationPermission !== "granted" && (
-                            <button onClick={enableLocation} className="w-full px-3 py-2 text-sm rounded-lg bg-primary text-white">
-                                {t.mapEnableLocation}
-                            </button>
-                        )}
-                        {locationPermission === "denied" && (
-                            <p className="mt-2 text-xs text-amber-700 dark:text-amber-300">{t.mapLocationDenied}</p>
-                        )}
-                        {locationPermission === "unavailable" && (
-                            <p className="mt-2 text-xs text-amber-700 dark:text-amber-300">{t.mapLocationUnavailable}</p>
-                        )}
-                        {!leafletReady && (
-                            <p className="mt-2 text-xs text-red-700 dark:text-red-300">Map engine failed to load. Refresh the page.</p>
-                        )}
-                    </div>
+            /* ── Nav mode state ── */
+            const [navMode, setNavMode] = React.useState(false);
 
-                    <div
-                        dir={activeLanguage === "ar" ? "rtl" : "ltr"}
-                        className={`bottom-sheet ${sheetState} absolute left-0 right-0 bottom-20 z-[500] bg-white/97 dark:bg-gray-900/97 backdrop-blur rounded-t-[28px] border-t border-gray-200 dark:border-gray-800 shadow-2xl flex flex-col`}
-                    >
-                        <div className="px-4 pt-2 pb-3 border-b border-gray-200 dark:border-gray-800">
-                            <div className="mx-auto w-12 h-1.5 rounded-full bg-gray-300 dark:bg-gray-700 mb-3"></div>
-                            <div className="flex items-center justify-between gap-2">
-                                <div className="flex gap-2 text-xs">
-                                    <button onClick={() => setSheetState("collapsed")} className={`px-3 py-1.5 rounded-lg ${sheetState === "collapsed" ? "bg-primary text-white" : "bg-gray-100 dark:bg-gray-800"}`}>Min</button>
-                                    <button onClick={() => setSheetState("half")} className={`px-3 py-1.5 rounded-lg ${sheetState === "half" ? "bg-primary text-white" : "bg-gray-100 dark:bg-gray-800"}`}>Mid</button>
-                                    <button onClick={() => setSheetState("full")} className={`px-3 py-1.5 rounded-lg ${sheetState === "full" ? "bg-primary text-white" : "bg-gray-100 dark:bg-gray-800"}`}>Max</button>
-                                </div>
-                                <div className="flex gap-2">
-                                    <button onClick={clearRoute} className="px-3 py-1.5 text-xs rounded-lg bg-gray-100 dark:bg-gray-800">{t.mapClearRoute}</button>
-                                    {locationPermission === "granted" && route && (
-                                        <button onClick={reroute} className="px-3 py-1.5 text-xs rounded-lg bg-primary text-white">{t.mapReroute}</button>
+            return (
+                <div className="map-root" dir={activeLanguage === "ar" ? "rtl" : "ltr"}>
+                    {/* Body = panel + map */}
+                    <div className="map-body">
+
+                        {/* ── Side Panel ── */}
+                        <div className="map-panel">
+                            <div className="hide-scrollbar" style={{ flex: 1, overflowY: "auto", padding: "16px", display: "flex", flexDirection: "column", gap: 12 }}>
+
+                                {/* Search */}
+                                <div style={{ display: "flex", alignItems: "center", background: "#f3f4f6", borderRadius: 14, padding: "0 12px", height: 46, gap: 8 }}>
+                                    {selectedDestination ? (
+                                        <button
+                                            onClick={() => { setSelectedDestination(null); setSearchQuery(""); setSearchResults([]); setRoute(null); setRouteError(null); setNavMode(false); }}
+                                            style={{ color: "#6b7280", background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", flexShrink: 0 }}
+                                        >
+                                            <span className="material-symbols-outlined" style={{ fontSize: 20 }}>arrow_back</span>
+                                        </button>
+                                    ) : (
+                                        <span className="material-symbols-outlined" style={{ fontSize: 18, color: "#9ca3af", flexShrink: 0 }}>search</span>
+                                    )}
+                                    <input
+                                        className="map-search-input"
+                                        placeholder={t.mapSearchDestination}
+                                        value={searchQuery}
+                                        onChange={(e) => { setSearchQuery(e.target.value); setSelectedDestination(null); }}
+                                    />
+                                    {searchQuery.length > 0 && (
+                                        <button onClick={() => { setSearchQuery(""); setSearchResults([]); }} style={{ color: "#9ca3af", background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", flexShrink: 0 }}>
+                                            <span className="material-symbols-outlined" style={{ fontSize: 18 }}>close</span>
+                                        </button>
                                     )}
                                 </div>
-                            </div>
-                        </div>
 
-                        <div className="p-4 overflow-y-auto text-start space-y-4">
-                            <div>
-                                <input
-                                    className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm"
-                                    placeholder={t.mapSearchDestination}
-                                    value={searchQuery}
-                                    onChange={(e) => setSearchQuery(e.target.value)}
-                                />
-                                {searchResults.length > 0 && (
-                                    <div className="mt-2 max-h-32 overflow-y-auto rounded-xl border border-gray-200 dark:border-gray-700">
-                                        {searchResults.map((place) => (
+                                {/* Search results */}
+                                {!selectedDestination && searchResults.length > 0 && (
+                                    <div style={{ borderRadius: 14, border: "1px solid #e5e7eb", background: "#fff", overflow: "hidden" }}>
+                                        {searchResults.map((place, i) => (
                                             <button
                                                 key={place.id}
                                                 onClick={() => selectDestination(place)}
-                                                className="w-full text-start px-3 py-2 border-b last:border-b-0 border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800"
+                                                style={{
+                                                    width: "100%", textAlign: "start", padding: "11px 14px",
+                                                    background: "none", border: "none",
+                                                    borderBottom: i < searchResults.length - 1 ? "1px solid #f3f4f6" : "none",
+                                                    cursor: "pointer", fontFamily: "inherit",
+                                                    display: "flex", alignItems: "center", gap: 10,
+                                                }}
+                                                onMouseEnter={(e) => e.currentTarget.style.background = "#f9fafb"}
+                                                onMouseLeave={(e) => e.currentTarget.style.background = "none"}
                                             >
-                                                <div className="text-sm font-semibold">{place.name}</div>
-                                                <div className="text-xs text-gray-500">{place.type} • {place.campus}</div>
+                                                <span className="material-symbols-outlined" style={{ fontSize: 16, color: "#9ca3af", flexShrink: 0 }}>place</span>
+                                                <div>
+                                                    <div style={{ fontSize: 13, fontWeight: 600, color: "#111827" }}>{place.name}</div>
+                                                    <div style={{ fontSize: 11, color: "#6b7280" }}>{place.type} &bull; {place.campus}</div>
+                                                </div>
                                             </button>
                                         ))}
                                     </div>
                                 )}
-                            </div>
 
-                            <div className="flex gap-2">
-                                <button
-                                    onClick={useMyLocationAsOrigin}
-                                    className={`px-3 py-2 rounded-lg text-sm ${originMode === "gps" ? "bg-primary text-white" : "bg-gray-100 dark:bg-gray-800"}`}
-                                >
-                                    {t.mapUseMyLocation}
-                                </button>
-                                <button
-                                    onClick={() => setOriginMode("manual")}
-                                    className={`px-3 py-2 rounded-lg text-sm ${originMode === "manual" ? "bg-primary text-white" : "bg-gray-100 dark:bg-gray-800"}`}
-                                >
-                                    {t.mapSelectManualOrigin}
-                                </button>
-                            </div>
+                                {/* Welcome state */}
+                                {!selectedDestination && searchResults.length === 0 && (
+                                    <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 8, padding: "40px 0", opacity: 0.5 }}>
+                                        <span className="material-symbols-outlined" style={{ fontSize: 48, color: "#9ca3af" }}>explore</span>
+                                        <div style={{ fontSize: 14, color: "#6b7280", textAlign: "center" }}>Search for a campus building to get started</div>
+                                    </div>
+                                )}
 
-                            {originMode === "manual" && (
-                                <div>
-                                    <input
-                                        className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm"
-                                        placeholder={t.mapSearchOrigin}
-                                        value={originSearchQuery}
-                                        onChange={(e) => setOriginSearchQuery(e.target.value)}
-                                    />
-                                    <p className="text-xs text-gray-500 mt-1">{t.mapTapMapOrigin}</p>
-                                    {originSearchResults.length > 0 && (
-                                        <div className="mt-2 max-h-28 overflow-y-auto rounded-xl border border-gray-200 dark:border-gray-700">
-                                            {originSearchResults.map((place) => (
-                                                <button
-                                                    key={place.id}
-                                                    onClick={() => selectManualOrigin(place)}
-                                                    className="w-full text-start px-3 py-2 border-b last:border-b-0 border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800"
+                                {/* Destination selected */}
+                                {selectedDestination && (
+                                    <React.Fragment>
+                                        {/* Destination header */}
+                                        <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "4px 0" }}>
+                                            <div style={{ width: 40, height: 40, borderRadius: "50%", background: "#eef2ff", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                                                <span className="material-symbols-outlined" style={{ fontSize: 20, color: "#135bec" }}>place</span>
+                                            </div>
+                                            <div style={{ flex: 1 }}>
+                                                <div style={{ fontSize: 15, fontWeight: 700, color: "#111827" }}>{selectedDestination.name}</div>
+                                                {selectedDestination.campus && <div style={{ fontSize: 12, color: "#6b7280", marginTop: 1 }}>{selectedDestination.campus}</div>}
+                                            </div>
+                                        </div>
+
+                                        {/* Transport pills */}
+                                        <div style={{ display: "flex", gap: 8 }}>
+                                            {[
+                                                { key: "foot",    icon: "directions_walk", label: t.mapProfileFoot },
+                                                { key: "cycling", icon: "pedal_bike",      label: t.mapProfileCycling },
+                                                { key: "driving", icon: "directions_car",  label: t.mapProfileDriving },
+                                            ].map((p) => (
+                                                <button key={p.key} onClick={() => setProfile(p.key)}
+                                                    className={"transport-pill" + (profile === p.key ? " active" : "")}
                                                 >
-                                                    <div className="text-sm font-semibold">{place.name}</div>
-                                                    <div className="text-xs text-gray-500">{place.type} • {place.campus}</div>
+                                                    <span className="material-symbols-outlined" style={{ fontSize: 18 }}>{p.icon}</span>
+                                                    {p.label}
                                                 </button>
                                             ))}
                                         </div>
-                                    )}
+
+                                        {/* Origin toggle */}
+                                        <div style={{ display: "flex", background: "#f3f4f6", borderRadius: 12, padding: 3 }}>
+                                            {[
+                                                { mode: "gps",    icon: "my_location", label: t.mapUseMyLocation,      action: useMyLocationAsOrigin },
+                                                { mode: "manual", icon: "place",       label: t.mapSelectManualOrigin, action: () => setOriginMode("manual") },
+                                            ].map(({ mode, icon, label, action }) => (
+                                                <button key={mode} onClick={action}
+                                                    style={{
+                                                        flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+                                                        padding: "9px 8px", fontSize: 12, fontWeight: 500,
+                                                        borderRadius: 10, border: "none", cursor: "pointer", fontFamily: "inherit",
+                                                        background: originMode === mode ? "#fff" : "transparent",
+                                                        color: originMode === mode ? "#135bec" : "#6b7280",
+                                                        boxShadow: originMode === mode ? "0 1px 4px rgba(0,0,0,.08)" : "none",
+                                                        transition: "all .15s",
+                                                    }}
+                                                >
+                                                    <span className="material-symbols-outlined" style={{ fontSize: 15 }}>{icon}</span>
+                                                    {label}
+                                                </button>
+                                            ))}
+                                        </div>
+
+                                        {/* Manual origin */}
+                                        {originMode === "manual" && (
+                                            <div>
+                                                <div style={{ display: "flex", alignItems: "center", background: "#f9fafb", border: "1.5px solid #e5e7eb", borderRadius: 12, padding: "0 12px", height: 42, gap: 8 }}>
+                                                    <span className="material-symbols-outlined" style={{ fontSize: 16, color: "#135bec" }}>trip_origin</span>
+                                                    <input
+                                                        className="map-search-input"
+                                                        style={{ fontSize: 13 }}
+                                                        placeholder={t.mapSearchOrigin}
+                                                        value={originSearchQuery}
+                                                        onChange={(e) => setOriginSearchQuery(e.target.value)}
+                                                    />
+                                                </div>
+                                                <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 4 }}>{t.mapTapMapOrigin}</div>
+                                                {originSearchResults.length > 0 && (
+                                                    <div style={{ marginTop: 4, borderRadius: 12, border: "1px solid #e5e7eb", background: "#fff", overflow: "hidden" }}>
+                                                        {originSearchResults.map((place) => (
+                                                            <button key={place.id} onClick={() => selectManualOrigin(place)}
+                                                                style={{ width: "100%", textAlign: "start", padding: "9px 12px", border: "none", borderBottom: "1px solid #f3f4f6", background: "none", cursor: "pointer", fontFamily: "inherit" }}
+                                                            >
+                                                                <div style={{ fontSize: 13, fontWeight: 600, color: "#111827" }}>{place.name}</div>
+                                                                <div style={{ fontSize: 11, color: "#6b7280" }}>{place.type}</div>
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+
+                                        {/* Get Directions */}
+                                        <div style={{ display: "flex", gap: 8 }}>
+                                            <button
+                                                onClick={() => requestDirections()}
+                                                disabled={loadingRoute}
+                                                style={{
+                                                    flex: 1, height: 44, borderRadius: 22, border: "none",
+                                                    cursor: loadingRoute ? "not-allowed" : "pointer",
+                                                    background: "#135bec", color: "#fff",
+                                                    fontFamily: "inherit", fontWeight: 700, fontSize: 14,
+                                                    boxShadow: "0 3px 12px rgba(19,91,236,.28)",
+                                                    opacity: loadingRoute ? .65 : 1,
+                                                    display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+                                                }}
+                                            >
+                                                {loadingRoute
+                                                    ? React.createElement(React.Fragment, null, React.createElement("span", {className:"material-symbols-outlined", style:{fontSize:18, animation:"spin 1s linear infinite"}}, "progress_activity"), " Loading\u2026")
+                                                    : React.createElement(React.Fragment, null, React.createElement("span", {className:"material-symbols-outlined", style:{fontSize:18}}, "directions"), t.mapGetDirections)}
+                                            </button>
+                                            {locationPermission === "granted" && route && (
+                                                <button onClick={reroute} className="map-chip" style={{ background: "#eef2ff", color: "#135bec" }}>
+                                                    <span className="material-symbols-outlined" style={{ fontSize: 16 }}>refresh</span>
+                                                </button>
+                                            )}
+                                        </div>
+
+                                        {/* Route error */}
+                                        {routeError && (
+                                            <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 12px", background: "#fef2f2", borderRadius: 10, color: "#b91c1c", fontSize: 13 }}>
+                                                <span className="material-symbols-outlined" style={{ fontSize: 16 }}>error</span>
+                                                {routeError}
+                                            </div>
+                                        )}
+
+                                        {/* Route result */}
+                                        {route && (
+                                            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                                                {/* ETA card */}
+                                                <div style={{
+                                                    display: "flex", alignItems: "center", justifyContent: "space-between",
+                                                    padding: "14px 18px", borderRadius: 14,
+                                                    background: "linear-gradient(135deg, #135bec 0%, #4f8cff 100%)",
+                                                    color: "#fff", boxShadow: "0 4px 18px rgba(19,91,236,.28)",
+                                                }}>
+                                                    <div>
+                                                        <div style={{ fontSize: 11, opacity: .8, fontWeight: 500 }}>{t.mapEta}</div>
+                                                        <div style={{ fontSize: 26, fontWeight: 900, lineHeight: 1.1 }}>{formatDuration(route.duration_s)}</div>
+                                                    </div>
+                                                    <div style={{ textAlign: "right" }}>
+                                                        <div style={{ fontSize: 11, opacity: .8, fontWeight: 500 }}>{t.mapDistance}</div>
+                                                        <div style={{ fontSize: 20, fontWeight: 700 }}>{formatDistance(route.distance_m)}</div>
+                                                    </div>
+                                                </div>
+
+                                                {/* Start Nav button */}
+                                                <button
+                                                    onClick={() => setNavMode(true)}
+                                                    style={{
+                                                        width: "100%", height: 44, borderRadius: 22, border: "none",
+                                                        background: "linear-gradient(135deg, #16a34a, #15803d)",
+                                                        color: "#fff", fontFamily: "inherit", fontWeight: 700, fontSize: 14,
+                                                        boxShadow: "0 3px 12px rgba(22,163,74,.30)",
+                                                        display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+                                                        cursor: "pointer",
+                                                    }}
+                                                >
+                                                    <span className="material-symbols-outlined" style={{ fontSize: 20 }}>navigation</span>
+                                                    Start Navigation
+                                                </button>
+
+                                                {/* Steps */}
+                                                <div>
+                                                    <div style={{ fontSize: 13, fontWeight: 700, color: "#374151", marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
+                                                        <span className="material-symbols-outlined" style={{ fontSize: 16, color: "#135bec" }}>route</span>
+                                                        {t.mapSteps}
+                                                    </div>
+                                                    {Array.isArray(route.steps) && route.steps.length > 0 ? (
+                                                        <div style={{ position: "relative", paddingLeft: 18, borderLeft: "2px solid #e5e7eb", display: "flex", flexDirection: "column", gap: 12 }}>
+                                                            {route.steps.map((step, idx) => (
+                                                                <div key={idx} style={{ position: "relative" }}>
+                                                                    <div style={{ position: "absolute", left: -23, top: 5, width: 10, height: 10, background: "#135bec", borderRadius: "50%", border: "2px solid #fff", boxShadow: "0 0 0 2px #135bec" }} />
+                                                                    <div style={{ background: "#f9fafb", border: "1px solid #f0f0f0", borderRadius: 10, padding: "8px 10px" }}>
+                                                                        <div style={{ fontSize: 12, fontWeight: 500, color: "#1f2937", lineHeight: 1.4 }}>{step.instruction}</div>
+                                                                        <div style={{ display: "flex", gap: 10, marginTop: 4, fontSize: 11, color: "#6b7280", fontWeight: 600 }}>
+                                                                            <span style={{ display: "flex", alignItems: "center", gap: 3 }}>
+                                                                                <span className="material-symbols-outlined" style={{ fontSize: 12 }}>straighten</span>{formatDistance(step.distance_m)}
+                                                                            </span>
+                                                                            <span style={{ display: "flex", alignItems: "center", gap: 3 }}>
+                                                                                <span className="material-symbols-outlined" style={{ fontSize: 12 }}>schedule</span>{formatDuration(step.duration_s)}
+                                                                            </span>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    ) : (
+                                                        <div style={{ fontSize: 13, color: "#6b7280", padding: "10px 12px", background: "#f9fafb", borderRadius: 10 }}>{t.mapNoSteps}</div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </React.Fragment>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* ── Map Canvas ── */}
+                        <div className="map-canvas">
+                            <div id="map-el" ref={mapContainerRef} />
+
+                            {/* FABs */}
+                            <div style={{ position: "absolute", top: 14, right: 14, zIndex: 500, display: "flex", flexDirection: "column", gap: 8 }}>
+                                <button
+                                    className="map-fab"
+                                    style={{ background: locationPermission === "granted" ? "#135bec" : "#fff", color: locationPermission === "granted" ? "#fff" : "#374151" }}
+                                    onClick={locationPermission === "granted" ? useMyLocationAsOrigin : enableLocation}
+                                    title={t.mapEnableLocation}
+                                >
+                                    <span className="material-symbols-outlined" style={{ fontSize: 21 }}>
+                                        {locationPermission === "granted" ? "my_location" : "location_searching"}
+                                    </span>
+                                </button>
+                                {route && routeLayerRef.current && (
+                                    <button
+                                        className="map-fab"
+                                        style={{ background: "#fff", color: "#374151" }}
+                                        onClick={() => mapRef.current && routeLayerRef.current && mapRef.current.fitBounds(routeLayerRef.current.getBounds(), { padding: [40, 40] })}
+                                        title="Fit route"
+                                    >
+                                        <span className="material-symbols-outlined" style={{ fontSize: 20 }}>fit_screen</span>
+                                    </button>
+                                )}
+                            </div>
+
+                            {/* Error toast */}
+                            {(locationPermission === "denied" || locationPermission === "unavailable" || !leafletReady) && (
+                                <div style={{ position: "absolute", top: 14, left: 14, right: 70, zIndex: 500 }}>
+                                    <div style={{ background: "#fef2f2", color: "#b91c1c", fontSize: 12, padding: "8px 14px", borderRadius: 10, boxShadow: "0 2px 8px rgba(0,0,0,.10)" }}>
+                                        {!leafletReady ? "Map engine failed to load. Refresh the page."
+                                            : locationPermission === "denied" ? t.mapLocationDenied
+                                            : t.mapLocationUnavailable}
+                                    </div>
                                 </div>
                             )}
 
-                            <div className="flex gap-2">
-                                {[
-                                    { key: "foot", label: t.mapProfileFoot },
-                                    { key: "cycling", label: t.mapProfileCycling },
-                                    { key: "driving", label: t.mapProfileDriving }
-                                ].map((p) => (
-                                    <button
-                                        key={p.key}
-                                        onClick={() => setProfile(p.key)}
-                                        className={`px-3 py-2 rounded-lg text-sm ${profile === p.key ? "bg-primary text-white" : "bg-gray-100 dark:bg-gray-800"}`}
-                                    >
-                                        {p.label}
-                                    </button>
-                                ))}
-                            </div>
-
-                            <button
-                                onClick={() => requestDirections()}
-                                disabled={loadingRoute}
-                                className="w-full h-11 rounded-xl bg-primary text-white font-semibold disabled:opacity-50"
-                            >
-                                {loadingRoute ? "..." : t.mapGetDirections}
-                            </button>
-
-                            {routeError && <div className="text-sm text-red-600 dark:text-red-400">{routeError}</div>}
-
-                            {route && (
-                                <div className="space-y-3">
-                                    <div className="grid grid-cols-2 gap-3">
-                                        <div className="p-3 rounded-xl bg-gray-50 dark:bg-gray-800">
-                                            <div className="text-xs text-gray-500">{t.mapDistance}</div>
-                                            <div className="text-lg font-bold">{formatDistance(route.distance_m)}</div>
+                            {/* Navigation HUD */}
+                            {navMode && route && (
+                                <div className="nav-hud">
+                                    <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
+                                        <div style={{ flex: 1 }}>
+                                            <div style={{ fontSize: 11, opacity: .8, fontWeight: 500, marginBottom: 2 }}>Navigating to</div>
+                                            <div style={{ fontSize: 16, fontWeight: 700, lineHeight: 1.2 }}>{selectedDestination ? selectedDestination.name : ""}</div>
+                                            {Array.isArray(route.steps) && route.steps.length > 0 && (
+                                                <div style={{ marginTop: 8, fontSize: 13, opacity: .9, fontWeight: 500, display: "flex", alignItems: "center", gap: 6 }}>
+                                                    <span className="material-symbols-outlined" style={{ fontSize: 18, flexShrink: 0 }}>turn_right</span>
+                                                    {route.steps[0].instruction}
+                                                </div>
+                                            )}
                                         </div>
-                                        <div className="p-3 rounded-xl bg-gray-50 dark:bg-gray-800">
-                                            <div className="text-xs text-gray-500">{t.mapEta}</div>
-                                            <div className="text-lg font-bold">{formatDuration(route.duration_s)}</div>
+                                        <div style={{ textAlign: "right", flexShrink: 0 }}>
+                                            <div style={{ fontSize: 22, fontWeight: 900 }}>{formatDuration(route.duration_s)}</div>
+                                            <div style={{ fontSize: 12, opacity: .8 }}>{formatDistance(route.distance_m)}</div>
                                         </div>
                                     </div>
-                                    <div>
-                                        <div className="font-semibold mb-2">{t.mapSteps}</div>
-                                        {Array.isArray(route.steps) && route.steps.length > 0 ? (
-                                            <div className="space-y-2">
-                                                {route.steps.map((step, idx) => (
-                                                    <div key={idx} className="p-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
-                                                        <div className="text-sm">{step.instruction}</div>
-                                                        <div className="text-xs text-gray-500 mt-1">
-                                                            {formatDistance(step.distance_m)} • {formatDuration(step.duration_s)}
-                                                        </div>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        ) : (
-                                            <div className="text-sm text-gray-500">{t.mapNoSteps}</div>
-                                        )}
+                                    <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+                                        <button
+                                            onClick={() => setNavMode(false)}
+                                            style={{ flex: 1, height: 36, borderRadius: 18, border: "1.5px solid rgba(255,255,255,.5)", background: "none", color: "#fff", fontFamily: "inherit", fontWeight: 600, fontSize: 13, cursor: "pointer" }}
+                                        >
+                                            Exit Navigation
+                                        </button>
+                                        <button
+                                            onClick={() => { mapRef.current && routeLayerRef.current && mapRef.current.fitBounds(routeLayerRef.current.getBounds(), { padding: [40, 40] }); }}
+                                            style={{ height: 36, width: 36, borderRadius: 18, border: "none", background: "rgba(255,255,255,.2)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}
+                                        >
+                                            <span className="material-symbols-outlined" style={{ fontSize: 18 }}>fit_screen</span>
+                                        </button>
                                     </div>
                                 </div>
                             )}
                         </div>
+
                     </div>
 
                     <BottomNav active="map" />

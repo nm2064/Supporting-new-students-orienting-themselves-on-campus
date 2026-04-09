@@ -1,85 +1,96 @@
-"""Configuration module for the Agentic RAG backend."""
-import os
-from dotenv import load_dotenv
+"""Backward-compatible configuration exports."""
 
-# Load .env from the same directory as this file
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-load_dotenv(os.path.join(BASE_DIR, ".env"))
+from __future__ import annotations
 
-# API Keys
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
+from .settings import ConfigurationError, get_settings, reload_settings
 
-# Azure OpenAI Configuration (optional - for Azure deployments)
-AZURE_OPENAI_ENDPOINT = os.getenv("AZURE_OPENAI_ENDPOINT", "")  # e.g., https://your-resource.openai.azure.com
-AZURE_OPENAI_API_VERSION = os.getenv("AZURE_OPENAI_API_VERSION", "2024-02-01")
-# Backward-compatible single deployment key (legacy). Prefer chat/embedding split below.
-AZURE_OPENAI_DEPLOYMENT = os.getenv("AZURE_OPENAI_DEPLOYMENT", "")
-AZURE_OPENAI_CHAT_DEPLOYMENT = os.getenv(
-    "AZURE_OPENAI_CHAT_DEPLOYMENT",
-    os.getenv("AZURE_OPENAI_DEPLOYMENT", "")
-)
-AZURE_OPENAI_EMBEDDING_DEPLOYMENT = os.getenv(
-    "AZURE_OPENAI_EMBEDDING_DEPLOYMENT",
-    os.getenv("AZURE_OPENAI_DEPLOYMENT", "")
-)
-USE_AZURE_OPENAI = os.getenv("USE_AZURE_OPENAI", "false").lower() == "true"
 
-# Debug: Print loaded keys (masked)
-print(f"OpenAI Key loaded: {'Yes (' + OPENAI_API_KEY[:10] + '...)' if OPENAI_API_KEY else 'No'}")
-if USE_AZURE_OPENAI:
-    print(f"Using Azure OpenAI: {AZURE_OPENAI_ENDPOINT}")
-    print(f"  API Version: {AZURE_OPENAI_API_VERSION}")
-    if AZURE_OPENAI_CHAT_DEPLOYMENT:
-        print(f"  Chat Deployment: {AZURE_OPENAI_CHAT_DEPLOYMENT}")
-    if AZURE_OPENAI_EMBEDDING_DEPLOYMENT:
-        print(f"  Embedding Deployment: {AZURE_OPENAI_EMBEDDING_DEPLOYMENT}")
+def _current():
+    return get_settings()
 
-# Embedding Configuration
-EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "text-embedding-3-small")
 
-# Chat/Translation model configuration (OpenAI-only stack)
-CHAT_MODEL = os.getenv("CHAT_MODEL", "gpt-4o-mini")
-TRANSLATION_MODEL = os.getenv("TRANSLATION_MODEL", CHAT_MODEL)
-CHAT_TEMPERATURE = float(os.getenv("CHAT_TEMPERATURE", "0.2"))
-CHAT_MAX_TOKENS = int(os.getenv("CHAT_MAX_TOKENS", "1200"))
-
-# Multilingual configuration
-LANGUAGE_DETECTION_CONFIDENCE_THRESHOLD = float(
-    os.getenv("LANGUAGE_DETECTION_CONFIDENCE_THRESHOLD", "0.9")
-)
-
-# Chunking Configuration
-CHUNK_SIZE = int(os.getenv("CHUNK_SIZE", "300"))
-CHUNK_OVERLAP = int(os.getenv("CHUNK_OVERLAP", "50"))
-
-# Retrieval Configuration
-TOP_K = int(os.getenv("TOP_K", "5"))
-SIMILARITY_THRESHOLD = float(os.getenv("SIMILARITY_THRESHOLD", "0.7"))
-
-# File Paths
-CHROMA_PERSIST_DIR = os.getenv("CHROMA_PERSIST_DIR", os.path.join(BASE_DIR, "chroma_store"))
-KNOWLEDGE_FILE = os.getenv("KNOWLEDGE_FILE", os.path.join(BASE_DIR, "knowledge.txt"))
-INGEST_STATE_FILE = os.path.join(CHROMA_PERSIST_DIR, "ingest_state.json")
-
-# Maps Configuration
-ORS_API_KEY = os.getenv("ORS_API_KEY", "")
-ORS_BASE_URL = os.getenv("ORS_BASE_URL", "https://api.openrouteservice.org")
-MAP_ROUTE_TIMEOUT_S = float(os.getenv("MAP_ROUTE_TIMEOUT_S", "8"))
-MAP_CACHE_TTL_S = int(os.getenv("MAP_CACHE_TTL_S", "300"))
-MAP_CACHE_MAX_ITEMS = int(os.getenv("MAP_CACHE_MAX_ITEMS", "1000"))
-MAP_RATE_LIMIT_ROUTE_PER_MIN = int(os.getenv("MAP_RATE_LIMIT_ROUTE_PER_MIN", "30"))
-MAP_RATE_LIMIT_PLACES_PER_MIN = int(os.getenv("MAP_RATE_LIMIT_PLACES_PER_MIN", "60"))
-MAP_ENABLE_TRANSLATION_FALLBACK = (
-    os.getenv("MAP_ENABLE_TRANSLATION_FALLBACK", "true").strip().lower() == "true"
-)
-MAPS_DATA_FILE = os.getenv("MAPS_DATA_FILE", os.path.join(BASE_DIR, "data", "campus_places.json"))
-
-# Validate required configuration
-def validate_config():
-    """Validate that required configuration is present."""
-    missing = []
-    if not OPENAI_API_KEY:
-        missing.append("OPENAI_API_KEY")
-    if missing:
-        raise ValueError(f"Missing required environment variables: {', '.join(missing)}")
+def validate_config() -> bool:
+    _current().validate_required()
     return True
+
+
+def reload_config() -> None:
+    reload_settings()
+    globals().update(_build_exports())
+
+
+def _build_exports() -> dict[str, object]:
+    settings = _current()
+    return {
+        "BASE_DIR": str(settings.base_dir),
+        "OPENAI_API_KEY": settings.openai_api_key,
+        "AZURE_OPENAI_API_KEY": settings.azure_openai_api_key,
+        "AZURE_OPENAI_ENDPOINT": settings.azure_openai_endpoint,
+        "AZURE_OPENAI_API_VERSION": settings.azure_openai_api_version,
+        "AZURE_OPENAI_DEPLOYMENT": settings.azure_openai_deployment,
+        "AZURE_OPENAI_CHAT_DEPLOYMENT": settings.azure_openai_chat_deployment,
+        "AZURE_OPENAI_EMBEDDING_DEPLOYMENT": settings.azure_openai_embedding_deployment,
+        "USE_AZURE_OPENAI": settings.use_azure_openai,
+        "EMBEDDING_MODEL": settings.embedding_model,
+        "CHAT_MODEL": settings.chat_model,
+        "TRANSLATION_MODEL": settings.translation_model,
+        "CHAT_TEMPERATURE": settings.chat_temperature,
+        "CHAT_MAX_TOKENS": settings.chat_max_tokens,
+        "LANGUAGE_DETECTION_CONFIDENCE_THRESHOLD": settings.language_detection_confidence_threshold,
+        "CHUNK_SIZE": settings.chunk_size,
+        "CHUNK_OVERLAP": settings.chunk_overlap,
+        "TOP_K": settings.top_k,
+        "SIMILARITY_THRESHOLD": settings.similarity_threshold,
+        "CHROMA_PERSIST_DIR": str(settings.chroma_persist_dir),
+        "KNOWLEDGE_FILE": str(settings.knowledge_file),
+        "INGEST_STATE_FILE": str(settings.ingest_state_file),
+        "ORS_API_KEY": settings.ors_api_key,
+        "ORS_BASE_URL": settings.ors_base_url,
+        "MAP_ROUTE_TIMEOUT_S": settings.map_route_timeout_s,
+        "MAP_CACHE_TTL_S": settings.map_cache_ttl_s,
+        "MAP_CACHE_MAX_ITEMS": settings.map_cache_max_items,
+        "MAP_RATE_LIMIT_ROUTE_PER_MIN": settings.map_rate_limit_route_per_min,
+        "MAP_RATE_LIMIT_PLACES_PER_MIN": settings.map_rate_limit_places_per_min,
+        "MAP_ENABLE_TRANSLATION_FALLBACK": settings.map_enable_translation_fallback,
+        "MAPS_DATA_FILE": str(settings.maps_data_file),
+    }
+
+
+globals().update(_build_exports())
+
+__all__ = [
+    "AZURE_OPENAI_API_VERSION",
+    "AZURE_OPENAI_API_KEY",
+    "AZURE_OPENAI_CHAT_DEPLOYMENT",
+    "AZURE_OPENAI_DEPLOYMENT",
+    "AZURE_OPENAI_EMBEDDING_DEPLOYMENT",
+    "AZURE_OPENAI_ENDPOINT",
+    "BASE_DIR",
+    "CHAT_MAX_TOKENS",
+    "CHAT_MODEL",
+    "CHAT_TEMPERATURE",
+    "CHROMA_PERSIST_DIR",
+    "CHUNK_OVERLAP",
+    "CHUNK_SIZE",
+    "ConfigurationError",
+    "EMBEDDING_MODEL",
+    "INGEST_STATE_FILE",
+    "KNOWLEDGE_FILE",
+    "LANGUAGE_DETECTION_CONFIDENCE_THRESHOLD",
+    "MAPS_DATA_FILE",
+    "MAP_CACHE_MAX_ITEMS",
+    "MAP_CACHE_TTL_S",
+    "MAP_ENABLE_TRANSLATION_FALLBACK",
+    "MAP_RATE_LIMIT_PLACES_PER_MIN",
+    "MAP_RATE_LIMIT_ROUTE_PER_MIN",
+    "MAP_ROUTE_TIMEOUT_S",
+    "OPENAI_API_KEY",
+    "ORS_API_KEY",
+    "ORS_BASE_URL",
+    "SIMILARITY_THRESHOLD",
+    "TOP_K",
+    "TRANSLATION_MODEL",
+    "USE_AZURE_OPENAI",
+    "reload_config",
+    "validate_config",
+]

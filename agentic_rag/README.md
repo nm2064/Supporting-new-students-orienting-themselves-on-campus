@@ -1,156 +1,95 @@
 # Agentic RAG Backend
 
-A complete Agentic RAG (Retrieval-Augmented Generation) system built with FastAPI, ChromaDB, OpenAI embeddings, and Google Gemini.
+FastAPI backend for the UniBot project, with RAG chat, session handling, and campus maps endpoints.
 
 ## Architecture
 
-```
+```text
 Frontend (index.html)
-         │
-         │ POST /rag-chat
-         ▼
-┌─────────────────────────────────────┐
-│         FastAPI Backend             │
-│  ┌─────────┐    ┌───────────────┐   │
-│  │ Router  │───>│ DIRECT_ANSWER │   │
-│  └────┬────┘    └───────────────┘   │
-│       │                              │
-│       ├──> RETRIEVE ──┐              │
-│       │                │              │
-│       └──> CLARIFY     ▼              │
-│                     ┌──────────┐      │
-│                     │ ChromaDB │      │
-│                     │+ OpenAI  │      │
-│                     │Embeddings│      │
-│                     └────┬─────┘      │
-│                          │            │
-│                     ┌────▼─────┐      │
-│                     │  Gemini  │      │
-│                     │  (LLM)   │      │
-│                     └──────────┘      │
-└─────────────────────────────────────┘
+        |
+        | POST /rag-chat
+        v
+FastAPI app factory (app.py)
+  |- API routes (api.py)
+  |- Maps routes (maps/)
+  |- RAG service runtime (rag.py)
+  |- Typed settings (settings.py)
+  `- Structured logging (logging_utils.py)
 ```
 
 ## Project Structure
 
-```
+```text
 agentic_rag/
-├── main.py              # FastAPI application
-├── rag.py               # Agentic RAG implementation
-├── config.py            # Configuration
+├── app.py               # FastAPI app factory
+├── api.py               # Core HTTP routes
+├── main.py              # Direct-run compatibility entrypoint
+├── rag.py               # RAG service runtime
+├── settings.py          # Environment parsing and validation
+├── schemas.py           # API models
+├── config.py            # Backward-compatible config exports
+├── maps/                # Places search and routing
+├── tests/               # Regression tests
 ├── requirements.txt     # Python dependencies
-├── knowledge.txt        # Knowledge base (edit this)
-├── chroma_store/        # ChromaDB persistence (auto-created)
-└── .env                 # Environment variables (create from .env.example)
+├── knowledge.txt        # Knowledge base
+├── chroma_store/        # Chroma persistence
+└── .env                 # Create from .env.example
 ```
-
-## Prerequisites
-
-- **Python 3.9+**
-- **OpenAI API Key** - for embeddings
-- **Google API Key** - for Gemini LLM
 
 ## Setup
 
-### 1. Navigate to this directory
-
 ```bash
-cd agentic_rag
+cd UniBot
+python -m venv .venv
+.venv\Scripts\activate
+pip install -r agentic_rag\requirements.txt
+copy agentic_rag\.env.example agentic_rag\.env
 ```
 
-### 2. Create Virtual Environment
+Required in `agentic_rag/.env`:
 
-```bash
-python -m venv venv
-
-# Windows
-venv\Scripts\activate
-
-# macOS/Linux
-source venv/bin/activate
-```
-
-### 3. Install Dependencies
-
-```bash
-pip install -r requirements.txt
-```
-
-### 4. Configure Environment
-
-```bash
-# Copy the example file
-cp .env.example .env
-
-# Edit .env and add your API keys
-```
-
-**Required in `.env`:**
 ```env
-OPENAI_API_KEY=sk-your-openai-key-here
-GOOGLE_API_KEY=your-google-api-key-here
+AZURE_OPENAI_API_KEY=your-azure-key
+USE_AZURE_OPENAI=true
+AZURE_OPENAI_ENDPOINT=https://openaidis.cognitiveservices.azure.com/
+AZURE_OPENAI_API_VERSION=2024-12-01-preview
+AZURE_OPENAI_CHAT_DEPLOYMENT=gpt-5-nano-2
+AZURE_OPENAI_EMBEDDING_DEPLOYMENT=text-embedding-3-small
+CHAT_MODEL=gpt-5-nano
+TRANSLATION_MODEL=gpt-5-nano
 ```
 
-### 5. Customize Knowledge Base
+Notes:
+- `AZURE_OPENAI_CHAT_DEPLOYMENT` should be your GPT-5 nano deployment name.
+- `AZURE_OPENAI_EMBEDDING_DEPLOYMENT` must be a separate embedding deployment; do not point embeddings at GPT-5 nano.
 
-Edit `knowledge.txt` with your organization-specific information.
+## Run
 
-### 6. Run Server
+Preferred:
 
 ```bash
-python main.py
+python -m agentic_rag
 ```
 
-Or with uvicorn:
+Alternative:
+
 ```bash
-uvicorn main:app --reload --host 0.0.0.0 --port 8000
+uvicorn agentic_rag.app:app --reload --host 0.0.0.0 --port 8000
 ```
 
 ## API Endpoints
 
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `http://localhost:8000/health` | GET | Health check |
-| `http://localhost:8000/ingest` | POST | Ingest knowledge file |
-| `http://localhost:8000/rag-chat` | POST | Chat with agentic RAG |
-| `http://localhost:8000/session/{id}` | GET/DELETE | Session management |
-| `http://localhost:8000/api/places?query=...` | GET | Search campus places |
-| `http://localhost:8000/api/places/{id}` | GET | Place details |
-| `http://localhost:8000/api/route` | POST | Walking/cycling/driving route |
-
-## Maps Configuration
-
-Add these settings in `.env` for Maps + Navigation:
-
-```env
-MAPS_DATA_FILE=./data/campus_places.json
-ORS_API_KEY=your-openrouteservice-key
-MAP_ROUTE_TIMEOUT_S=8
-MAP_CACHE_TTL_S=300
-MAP_RATE_LIMIT_ROUTE_PER_MIN=30
-MAP_RATE_LIMIT_PLACES_PER_MIN=60
-```
+- `GET /health`
+- `POST /ingest`
+- `POST /rag-chat`
+- `GET /session/{id}`
+- `DELETE /session/{id}`
+- `GET /api/places`
+- `GET /api/places/{id}`
+- `POST /api/route`
 
 ## Testing
 
 ```bash
-# Ingest knowledge
-curl -X POST http://localhost:8000/ingest \
-  -H "Content-Type: application/json" \
-  -d '{"force": true}'
-
-# Chat
-curl -X POST http://localhost:8000/rag-chat \
-  -H "Content-Type: application/json" \
-  -d '{"question": "What are the library hours?"}'
+python -m pytest agentic_rag/tests -q -p no:cacheprovider
 ```
-
-## Frontend Connection
-
-The frontend (`../index.html`) expects the backend at `http://localhost:8000/rag-chat`.
-
-See `../FRONTEND_INTEGRATION.md` for detailed frontend integration instructions.
-
-## Troubleshooting
-
-See the main `../README.md` for full troubleshooting guide.

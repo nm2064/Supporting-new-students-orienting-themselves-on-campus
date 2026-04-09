@@ -1,53 +1,26 @@
-"""Agentic RAG implementation with OpenAI embeddings + generation and multilingual support."""
+"""Agentic RAG implementation with structured runtime dependencies."""
+
+from __future__ import annotations
+
 import hashlib
 import json
-import os
+import logging
 import re
+import threading
 import uuid
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Tuple
+from pathlib import Path
+from typing import Any
 
 import chromadb
-from chromadb.config import Settings
+from chromadb.config import Settings as ChromaSettings
+from deep_translator import GoogleTranslator
 from langdetect import DetectorFactory, LangDetectException, detect_langs
 
-from config import (
-    AZURE_OPENAI_API_VERSION,
-    AZURE_OPENAI_CHAT_DEPLOYMENT,
-    AZURE_OPENAI_DEPLOYMENT,
-    AZURE_OPENAI_EMBEDDING_DEPLOYMENT,
-    AZURE_OPENAI_ENDPOINT,
-    CHAT_MAX_TOKENS,
-    CHAT_MODEL,
-    CHAT_TEMPERATURE,
-    CHROMA_PERSIST_DIR,
-    CHUNK_OVERLAP,
-    CHUNK_SIZE,
-    EMBEDDING_MODEL,
-    INGEST_STATE_FILE,
-    KNOWLEDGE_FILE,
-    LANGUAGE_DETECTION_CONFIDENCE_THRESHOLD,
-    OPENAI_API_KEY,
-    SIMILARITY_THRESHOLD,
-    TOP_K,
-    TRANSLATION_MODEL,
-    USE_AZURE_OPENAI,
-)
+from .logging_utils import log_event
+from .settings import AppSettings, get_settings
 
-if USE_AZURE_OPENAI and AZURE_OPENAI_ENDPOINT:
-    from openai import AzureOpenAI
-
-    openai_client = AzureOpenAI(
-        api_key=OPENAI_API_KEY,
-        api_version=AZURE_OPENAI_API_VERSION,
-        azure_endpoint=AZURE_OPENAI_ENDPOINT,
-    )
-    print(f"Initialized Azure OpenAI client: {AZURE_OPENAI_ENDPOINT}")
-else:
-    from openai import OpenAI
-
-    openai_client = OpenAI(api_key=OPENAI_API_KEY)
-    print("Initialized standard OpenAI client")
+logger = logging.getLogger("agentic_rag.rag")
 
 DetectorFactory.seed = 0
 
@@ -58,6 +31,7 @@ LANGUAGE_LABELS = {
     "hi": "Hindi",
     "ar": "Modern Standard Arabic",
 }
+DEFAULT_CAMPUS = "Edinburgh"
 
 
 @dataclass
@@ -77,34 +51,31 @@ class RetrievedChunk:
 
 @dataclass
 class RouterDecision:
-    action: str  # DIRECT_ANSWER | RETRIEVE | CLARIFY
+    action: str
     reasoning: str = ""
-    clarifying_question: Optional[str] = None
+    clarifying_question: str | None = None
 
 
 @dataclass
 class RagResponse:
     answer_markdown: str
     effective_language: str
-    citations: List[Dict[str, Any]] = field(default_factory=list)
-    follow_up_suggestions: List[str] = field(default_factory=list)
+    citations: list[dict[str, Any]] = field(default_factory=list)
+    follow_up_suggestions: list[str] = field(default_factory=list)
     needs_human_handoff: bool = False
     confidence: float = 0.0
-
-    # Backward-compat fields
     answer: str = ""
-    sources: List[Dict[str, Any]] = field(default_factory=list)
+    sources: list[dict[str, Any]] = field(default_factory=list)
     used_retrieval: bool = False
-    clarifying_question: Optional[str] = None
-    conversation_id: Optional[str] = None
-    session_id: Optional[str] = None
+    clarifying_question: str | None = None
+    conversation_id: str | None = None
+    session_id: str | None = None
     detection_confidence: float = 0.0
 
 
-def _normalize_ui_language(lang: Optional[str]) -> str:
-    if not lang:
+def _normalize_ui_language(language: str | None) -> str:
+    if not language:
         return "en"
-    cleaned = lang.strip()
     mapping = {
         "en": "en",
         "en-us": "en",
@@ -117,10 +88,10 @@ def _normalize_ui_language(lang: Optional[str]) -> str:
         "hi": "hi",
         "ar": "ar",
     }
-    return mapping.get(cleaned.lower(), "en")
+    return mapping.get(language.strip().lower(), "en")
 
 
-def _normalize_detected_language(lang: str) -> str:
+def _normalize_detected_language(language: str) -> str:
     mapping = {
         "en": "en",
         "zh": "zh-Hans",
@@ -129,199 +100,462 @@ def _normalize_detected_language(lang: str) -> str:
         "hi": "hi",
         "ar": "ar",
     }
-    return mapping.get(lang.lower(), "en")
+    return mapping.get(language.lower(), "en")
 
 
-class DocumentProcessor:
-    @staticmethod
-    def compute_file_hash(filepath: str) -> str:
-        hash_md5 = hashlib.md5()
-        with open(filepath, "rb") as f:
-            for chunk in iter(lambda: f.read(4096), b""):
-                hash_md5.update(chunk)
-        return hash_md5.hexdigest()
+def _normalize_campus(campus: str | None) -> str:
+    if not campus or not campus.strip():
+        return DEFAULT_CAMPUS
+    value = campus.strip()
+    lowered = value.lower()
+    mapping = {
+        "edinburgh": "Edinburgh",
+        "edinburgh campus": "Edinburgh",
+        "dubai": "Dubai",
+        "dubai campus": "Dubai",
+        "malaysia": "Malaysia",
+        "malaysia campus": "Malaysia",
+        "orkney": "Orkney",
+        "orkney campus": "Orkney",
+        "scottish borders": "Scottish Borders",
+        "borders": "Scottish Borders",
+        "scottish borders campus": "Scottish Borders",
+    }
+    return mapping.get(lowered, value)
 
-    @staticmethod
-    def load_ingest_state() -> Dict[str, Any]:
-        if os.path.exists(INGEST_STATE_FILE):
-            with open(INGEST_STATE_FILE, "r", encoding="utf-8") as f:
-                return json.load(f)
-        return {}
 
-    @staticmethod
-    def save_ingest_state(state: Dict[str, Any]):
-        os.makedirs(os.path.dirname(INGEST_STATE_FILE), exist_ok=True)
-        with open(INGEST_STATE_FILE, "w", encoding="utf-8") as f:
-            json.dump(state, f)
+class OpenAIBackend:
+    """Lazy OpenAI and Azure OpenAI client wrapper."""
 
-    @staticmethod
-    def needs_reingestion() -> bool:
-        if not os.path.exists(KNOWLEDGE_FILE):
-            raise FileNotFoundError(f"Knowledge file not found: {KNOWLEDGE_FILE}")
+    def __init__(self, settings: AppSettings):
+        self.settings = settings
+        self._client: Any | None = None
+        self._lock = threading.Lock()
 
-        current_hash = DocumentProcessor.compute_file_hash(KNOWLEDGE_FILE)
-        state = DocumentProcessor.load_ingest_state()
-        return state.get("file_hash") != current_hash
+    def _get_client(self) -> Any:
+        if self._client is not None:
+            return self._client
 
-    @staticmethod
-    def recursive_chunk(
-        text: str, chunk_size: int = CHUNK_SIZE, overlap: int = CHUNK_OVERLAP
-    ) -> List[Tuple[str, int, int]]:
-        chunks = []
-        paragraphs = re.split(r"\n\s*\n", text)
-        current_chunk = ""
-        current_start = 0
-        position = 0
+        with self._lock:
+            if self._client is not None:
+                return self._client
 
-        for para in paragraphs:
-            para = para.strip()
-            if not para:
-                position += 1
-                continue
+            self.settings.validate_required()
+            if self.settings.use_azure_openai and self.settings.azure_openai_endpoint:
+                from openai import AzureOpenAI
 
-            para_len = len(para)
-            if len(current_chunk) + para_len + 2 > chunk_size and current_chunk:
-                chunks.append((current_chunk.strip(), current_start, position - 1))
-                overlap_text = (
-                    current_chunk[-overlap:] if len(current_chunk) > overlap else current_chunk
+                self._client = AzureOpenAI(
+                    api_key=self.settings.effective_openai_api_key,
+                    api_version=self.settings.azure_openai_api_version,
+                    azure_endpoint=self.settings.azure_openai_endpoint,
                 )
-                current_chunk = overlap_text + "\n\n" + para
-                current_start = position - len(overlap_text.split("\n\n"))
+                log_event(
+                    logger,
+                    "openai_client_initialized",
+                    provider="azure_openai",
+                    endpoint=self.settings.azure_openai_endpoint,
+                )
             else:
-                if current_chunk:
-                    current_chunk += "\n\n" + para
-                else:
-                    current_chunk = para
-                    current_start = position
+                from openai import OpenAI
 
-            position += para_len + 2
+                self._client = OpenAI(api_key=self.settings.effective_openai_api_key)
+                log_event(logger, "openai_client_initialized", provider="openai")
 
-        if current_chunk:
-            chunks.append((current_chunk.strip(), current_start, position))
-        return chunks
+        return self._client
 
-    @classmethod
-    def process_file(cls, filepath: str = KNOWLEDGE_FILE) -> List[Chunk]:
-        with open(filepath, "r", encoding="utf-8") as f:
-            text = f.read()
-
-        raw_chunks = cls.recursive_chunk(text)
-        result = []
-        for i, (chunk_text, start, end) in enumerate(raw_chunks):
-            result.append(
-                Chunk(
-                    text=chunk_text,
-                    source=os.path.basename(filepath),
-                    chunk_id=f"chunk_{i:04d}",
-                    start_pos=start,
-                    end_pos=end,
-                )
-            )
-        return result
-
-
-class VectorStore:
-    COLLECTION_NAME = "knowledge_base"
-
-    def __init__(self):
-        self.client = chromadb.PersistentClient(
-            path=CHROMA_PERSIST_DIR, settings=Settings(allow_reset=True)
-        )
-        self.collection = None
-        self._ensure_collection()
-
-    def _ensure_collection(self):
-        try:
-            self.collection = self.client.get_collection(name=self.COLLECTION_NAME)
-        except Exception:
-            self.collection = self.client.create_collection(
-                name=self.COLLECTION_NAME, metadata={"hnsw:space": "cosine"}
-            )
+    def _chat_model_name(self, fallback_model: str) -> str:
+        if self.settings.use_azure_openai and self.settings.azure_openai_chat_deployment:
+            return self.settings.azure_openai_chat_deployment
+        if self.settings.use_azure_openai and self.settings.azure_openai_deployment:
+            return self.settings.azure_openai_deployment
+        return fallback_model
 
     def _embedding_model_name(self) -> str:
-        if USE_AZURE_OPENAI and AZURE_OPENAI_EMBEDDING_DEPLOYMENT:
-            return AZURE_OPENAI_EMBEDDING_DEPLOYMENT
-        if USE_AZURE_OPENAI and AZURE_OPENAI_DEPLOYMENT:
-            return AZURE_OPENAI_DEPLOYMENT
-        return EMBEDDING_MODEL
+        if self.settings.use_azure_openai and self.settings.azure_openai_embedding_deployment:
+            return self.settings.azure_openai_embedding_deployment
+        if self.settings.use_azure_openai and self.settings.azure_openai_deployment:
+            return self.settings.azure_openai_deployment
+        return self.settings.embedding_model
 
-    def embed_texts(self, texts: List[str]) -> List[List[float]]:
-        response = openai_client.embeddings.create(
+    @staticmethod
+    def _supports_custom_temperature(model_name: str) -> bool:
+        return "gpt-5" not in model_name.lower()
+
+    def embed_texts(self, texts: list[str]) -> list[list[float]]:
+        response = self._get_client().embeddings.create(
             model=self._embedding_model_name(),
             input=texts,
         )
         return [item.embedding for item in response.data]
 
-    def add_chunks(self, chunks: List[Chunk]):
+    def chat_json(self, system_prompt: str, user_prompt: str, model: str) -> dict[str, Any]:
+        chat_model = self._chat_model_name(model)
+        params: dict[str, Any] = {
+            "model": chat_model,
+            "response_format": {"type": "json_object"},
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+        }
+        if self._supports_custom_temperature(chat_model):
+            params["temperature"] = 0.1
+
+        response = self._get_client().chat.completions.create(**params)
+        content = (response.choices[0].message.content or "{}").strip()
+        try:
+            return json.loads(content)
+        except json.JSONDecodeError:
+            logger.warning("Model returned invalid JSON. Falling back to empty object.")
+            return {}
+
+    def chat_text(
+        self,
+        system_prompt: str,
+        user_prompt: str,
+        model: str,
+        temperature: float,
+        max_tokens: int,
+    ) -> str:
+        chat_model = self._chat_model_name(model)
+        params: dict[str, Any] = {
+            "model": chat_model,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+        }
+        if self._uses_completion_token_limit(chat_model):
+            params["max_completion_tokens"] = max_tokens
+        else:
+            params["max_tokens"] = max_tokens
+        if self._supports_custom_temperature(chat_model):
+            params["temperature"] = temperature
+
+        response = self._get_client().chat.completions.create(**params)
+        return (response.choices[0].message.content or "").strip()
+
+    @staticmethod
+    def _uses_completion_token_limit(model_name: str) -> bool:
+        normalized = model_name.lower()
+        return normalized.startswith(("gpt-5", "o1", "o3", "o4"))
+
+
+class DocumentProcessor:
+    """Reads and chunks the knowledge base file."""
+
+    def __init__(self, settings: AppSettings):
+        self.settings = settings
+        self.knowledge_file = settings.knowledge_file
+        self.ingest_state_file = settings.ingest_state_file
+
+    @staticmethod
+    def compute_file_hash(filepath: Path) -> str:
+        digest = hashlib.md5()
+        with filepath.open("rb") as handle:
+            for chunk in iter(lambda: handle.read(4096), b""):
+                digest.update(chunk)
+        return digest.hexdigest()
+
+    def load_ingest_state(self) -> dict[str, Any]:
+        if self.ingest_state_file.exists():
+            with self.ingest_state_file.open("r", encoding="utf-8") as handle:
+                return json.load(handle)
+        return {}
+
+    def save_ingest_state(self, state: dict[str, Any]) -> None:
+        self.ingest_state_file.parent.mkdir(parents=True, exist_ok=True)
+        with self.ingest_state_file.open("w", encoding="utf-8") as handle:
+            json.dump(state, handle, indent=2)
+
+    def needs_reingestion(self) -> bool:
+        if not self.knowledge_file.exists():
+            raise FileNotFoundError(f"Knowledge file not found: {self.knowledge_file}")
+
+        current_hash = self.compute_file_hash(self.knowledge_file)
+        state = self.load_ingest_state()
+        return state.get("file_hash") != current_hash
+
+    def recursive_chunk(self, text: str) -> list[tuple[str, int, int]]:
+        chunk_size = self.settings.chunk_size
+        overlap = self.settings.chunk_overlap
+
+        # Split large paragraphs by sentence so no single paragraph exceeds chunk_size
+        def split_paragraph(para: str) -> list[str]:
+            if len(para) <= chunk_size:
+                return [para]
+            sentences = re.split(r"(?<=[.!?])\s+", para)
+            sub_chunks: list[str] = []
+            current = ""
+            for sentence in sentences:
+                if len(current) + len(sentence) + 1 > chunk_size and current:
+                    sub_chunks.append(current.strip())
+                    current = sentence
+                else:
+                    current = f"{current} {sentence}".strip() if current else sentence
+            if current:
+                sub_chunks.append(current.strip())
+            return sub_chunks if sub_chunks else [para]
+
+        chunks: list[tuple[str, int, int]] = []
+        paragraphs = re.split(r"\n\s*\n", text)
+        current_chunk = ""
+        current_start = 0
+        position = 0
+
+        for paragraph in paragraphs:
+            paragraph = paragraph.strip()
+            if not paragraph:
+                position += 1
+                continue
+
+            sub_paragraphs = split_paragraph(paragraph)
+            for sub_para in sub_paragraphs:
+                sub_len = len(sub_para)
+                if len(current_chunk) + sub_len + 2 > chunk_size and current_chunk:
+                    chunks.append((current_chunk.strip(), current_start, position - 1))
+                    overlap_text = (
+                        current_chunk[-overlap:] if len(current_chunk) > overlap else current_chunk
+                    )
+                    current_chunk = overlap_text + "\n\n" + sub_para
+                    current_start = max(0, position - len(overlap_text.split("\n\n")))
+                else:
+                    current_chunk = f"{current_chunk}\n\n{sub_para}".strip() if current_chunk else sub_para
+                    if not chunks:
+                        current_start = position
+
+                position += sub_len + 2
+
+        if current_chunk:
+            chunks.append((current_chunk.strip(), current_start, position))
+
+        return chunks
+
+    def process_file(self, filepath: Path | None = None) -> list[Chunk]:
+        source_file = filepath or self.knowledge_file
+        if source_file.suffix.lower() == ".json":
+            return self._process_json_knowledge(source_file)
+        with source_file.open("r", encoding="utf-8") as handle:
+            text = handle.read()
+
+        processed_chunks: list[Chunk] = []
+        for index, (chunk_text, start, end) in enumerate(self.recursive_chunk(text)):
+            processed_chunks.append(
+                Chunk(
+                    text=chunk_text,
+                    source=source_file.name,
+                    chunk_id=f"chunk_{index:04d}",
+                    start_pos=start,
+                    end_pos=end,
+                )
+            )
+        return processed_chunks
+
+    def _process_json_knowledge(self, source_file: Path) -> list[Chunk]:
+        with source_file.open("r", encoding="utf-8") as handle:
+            payload = json.load(handle)
+
+        pages = payload.get("pages", [])
+        processed_chunks: list[Chunk] = []
+        chunk_index = 0
+
+        for page_index, page in enumerate(pages):
+            if not isinstance(page, dict):
+                continue
+
+            title = str(page.get("title", "")).strip()
+            category = str(page.get("category", "")).strip()
+            site_label = str(page.get("site_label", "")).strip()
+            url = str(page.get("url", "")).strip() or source_file.name
+            summary = str(page.get("summary", "")).strip()
+            headings = page.get("headings", [])
+            extracted_text = str(page.get("extracted_text", "")).strip()
+            if not extracted_text:
+                continue
+
+            page_sections: list[str] = []
+            if title:
+                page_sections.append(f"Title: {title}")
+            if category:
+                page_sections.append(f"Category: {category}")
+            if site_label:
+                page_sections.append(f"Site: {site_label}")
+            page_sections.append(f"URL: {url}")
+            if summary:
+                page_sections.append(f"Summary: {summary}")
+            if isinstance(headings, list):
+                cleaned_headings = [str(item).strip() for item in headings if str(item).strip()]
+                if cleaned_headings:
+                    page_sections.append(f"Headings: {' | '.join(cleaned_headings)}")
+            page_sections.append("Content:")
+            page_sections.append(extracted_text)
+            page_text = "\n\n".join(page_sections)
+
+            for part_index, (chunk_text, start, end) in enumerate(self.recursive_chunk(page_text)):
+                processed_chunks.append(
+                    Chunk(
+                        text=chunk_text,
+                        source=url,
+                        chunk_id=f"page_{page_index:04d}_chunk_{part_index:02d}_{chunk_index:04d}",
+                        start_pos=start,
+                        end_pos=end,
+                    )
+                )
+                chunk_index += 1
+
+        return processed_chunks
+
+
+class VectorStore:
+    COLLECTION_NAME = "knowledge_base"
+
+    def __init__(self, settings: AppSettings, backend: OpenAIBackend):
+        self.settings = settings
+        self.backend = backend
+        self.client = chromadb.PersistentClient(
+            path=str(settings.chroma_persist_dir),
+            settings=ChromaSettings(allow_reset=True),
+        )
+        self.collection: Any | None = None
+        self._ensure_collection()
+
+    def _ensure_collection(self) -> None:
+        try:
+            self.collection = self.client.get_collection(name=self.COLLECTION_NAME)
+        except Exception:
+            self.collection = self.client.create_collection(
+                name=self.COLLECTION_NAME,
+                metadata={"hnsw:space": "cosine"},
+            )
+
+    def add_chunks(self, chunks: list[Chunk]) -> None:
         if not chunks:
             return
 
         try:
             self.client.delete_collection(name=self.COLLECTION_NAME)
         except Exception:
-            pass
+            logger.debug("Vector collection did not exist before refresh.")
 
         self.collection = self.client.create_collection(
-            name=self.COLLECTION_NAME, metadata={"hnsw:space": "cosine"}
+            name=self.COLLECTION_NAME,
+            metadata={"hnsw:space": "cosine"},
         )
 
         batch_size = 100
-        for i in range(0, len(chunks), batch_size):
-            batch = chunks[i : i + batch_size]
-            texts = [c.text for c in batch]
-            embeddings = self.embed_texts(texts)
+        for batch_start in range(0, len(chunks), batch_size):
+            batch = chunks[batch_start : batch_start + batch_size]
+            texts = [chunk.text for chunk in batch]
+            embeddings = self.backend.embed_texts(texts)
             self.collection.add(
                 embeddings=embeddings,
                 documents=texts,
                 metadatas=[
                     {
-                        "source": c.source,
-                        "chunk_id": c.chunk_id,
-                        "start_pos": c.start_pos,
-                        "end_pos": c.end_pos,
+                        "source": chunk.source,
+                        "chunk_id": chunk.chunk_id,
+                        "start_pos": chunk.start_pos,
+                        "end_pos": chunk.end_pos,
                     }
-                    for c in batch
+                    for chunk in batch
                 ],
-                ids=[c.chunk_id for c in batch],
+                ids=[chunk.chunk_id for chunk in batch],
             )
 
     def search(
         self,
         query: str,
-        top_k: int = TOP_K,
-        campus: Optional[str] = None,
-        category: Optional[str] = None,
-    ) -> List[RetrievedChunk]:
-        # campus/category are currently pass-through placeholders until metadata is enriched.
+        top_k: int,
+        campus: str | None = None,
+        category: str | None = None,
+    ) -> list[RetrievedChunk]:
         _ = campus
         _ = category
 
-        query_embedding = self.embed_texts([query])[0]
+        if self.collection is None:
+            self._ensure_collection()
+        if self.collection is None:
+            return []
+
+        query_embedding = self.backend.embed_texts([query])[0]
         results = self.collection.query(
             query_embeddings=[query_embedding],
             n_results=top_k,
             include=["documents", "metadatas", "distances"],
         )
 
-        retrieved: List[RetrievedChunk] = []
-        if results["documents"] and results["documents"][0]:
-            for doc, metadata, distance in zip(
-                results["documents"][0], results["metadatas"][0], results["distances"][0]
-            ):
-                score = 1 - distance
-                retrieved.append(
-                    RetrievedChunk(
-                        chunk=Chunk(
-                            text=doc,
-                            source=metadata.get("source", "knowledge.txt"),
-                            chunk_id=metadata.get("chunk_id", "unknown_chunk"),
-                            start_pos=metadata.get("start_pos", 0),
-                            end_pos=metadata.get("end_pos", 0),
-                        ),
-                        score=score,
-                    )
+        retrieved: list[RetrievedChunk] = []
+        documents = results.get("documents") or []
+        metadatas = results.get("metadatas") or []
+        distances = results.get("distances") or []
+        if not documents or not documents[0]:
+            return retrieved
+
+        for document, metadata, distance in zip(documents[0], metadatas[0], distances[0]):
+            retrieved.append(
+                RetrievedChunk(
+                    chunk=Chunk(
+                        text=document,
+                        source=metadata.get("source", "knowledge.txt"),
+                        chunk_id=metadata.get("chunk_id", "unknown_chunk"),
+                        start_pos=metadata.get("start_pos", 0),
+                        end_pos=metadata.get("end_pos", 0),
+                    ),
+                    score=1 - distance,
                 )
+            )
+
         return retrieved
+
+
+@dataclass
+class SessionState:
+    history: list[dict[str, str]] = field(default_factory=list)
+    language_lock: str | None = None
+
+
+class SessionStore:
+    """Thread-safe in-memory session storage."""
+
+    def __init__(self, max_messages: int = 20):
+        self.max_messages = max_messages
+        self._sessions: dict[str, SessionState] = {}
+        self._lock = threading.Lock()
+
+    def history_for(self, session_id: str) -> list[dict[str, str]]:
+        with self._lock:
+            state = self._sessions.get(session_id)
+            if state is None:
+                return []
+            return [dict(message) for message in state.history]
+
+    def get_language_lock(self, session_id: str) -> str | None:
+        with self._lock:
+            state = self._sessions.get(session_id)
+            return state.language_lock if state else None
+
+    def set_language_lock(self, session_id: str, language: str) -> None:
+        with self._lock:
+            state = self._sessions.setdefault(session_id, SessionState())
+            state.language_lock = language
+
+    def clear_language_lock(self, session_id: str) -> None:
+        with self._lock:
+            state = self._sessions.get(session_id)
+            if state is not None:
+                state.language_lock = None
+
+    def append_exchange(self, session_id: str, user_message: str, assistant_message: str) -> None:
+        with self._lock:
+            state = self._sessions.setdefault(session_id, SessionState())
+            state.history.append({"role": "user", "content": user_message})
+            state.history.append({"role": "assistant", "content": assistant_message})
+            if len(state.history) > self.max_messages:
+                state.history = state.history[-self.max_messages :]
+
+    def clear(self, session_id: str) -> None:
+        with self._lock:
+            self._sessions.pop(session_id, None)
 
 
 class AgenticRAG:
@@ -343,6 +577,37 @@ class AgenticRAG:
         "admission",
         "enrollment",
         "course",
+        "enrol",
+        "timetable",
+        "wellbeing",
+        "well-being",
+        "counselling",
+        "counseling",
+        "accommodation",
+        "hall",
+        "society",
+        "societies",
+        "student group",
+        "sports",
+        "sport",
+        "visa",
+        "funding",
+        "scholarship",
+        "bursary",
+        "support",
+        "services",
+        "graduate",
+        "careers",
+        "career",
+    ]
+
+    BROAD_RETRIEVAL_PATTERNS = [
+        r"\bhow do i\b",
+        r"\bwhere can i find\b",
+        r"\bwhere do i\b",
+        r"\bwhat (support|services|options|clubs|societies|fees|funding)\b",
+        r"\bhow can i\b",
+        r"\bcan i\b.*\b(enrol|apply|join|transfer|book|find)\b",
     ]
 
     DIRECT_ANSWER_PATTERNS = [
@@ -355,18 +620,37 @@ class AgenticRAG:
         r"^(bye|goodbye)\b",
     ]
 
-    def __init__(self):
-        self.vector_store = VectorStore()
-        self.sessions: Dict[str, List[Dict[str, Any]]] = {}
-        self.session_language_locks: Dict[str, str] = {}
+    def __init__(
+        self,
+        settings: AppSettings,
+        backend: OpenAIBackend,
+        vector_store: VectorStore,
+        document_processor: DocumentProcessor,
+        session_store: SessionStore | None = None,
+    ):
+        self.settings = settings
+        self.backend = backend
+        self.vector_store = vector_store
+        self.document_processor = document_processor
+        self.session_store = session_store or SessionStore()
 
-    def ingest(self, force: bool = False) -> Dict[str, Any]:
-        if not os.path.exists(KNOWLEDGE_FILE):
-            raise FileNotFoundError(f"Knowledge file not found: {KNOWLEDGE_FILE}")
+    @classmethod
+    def from_settings(cls, settings: AppSettings) -> "AgenticRAG":
+        backend = OpenAIBackend(settings)
+        return cls(
+            settings=settings,
+            backend=backend,
+            vector_store=VectorStore(settings, backend),
+            document_processor=DocumentProcessor(settings),
+        )
 
-        needs_reingest = force or DocumentProcessor.needs_reingestion()
+    def ingest(self, force: bool = False) -> dict[str, Any]:
+        if not self.settings.knowledge_file.exists():
+            raise FileNotFoundError(f"Knowledge file not found: {self.settings.knowledge_file}")
+
+        needs_reingest = force or self.document_processor.needs_reingestion()
         if not needs_reingest:
-            state = DocumentProcessor.load_ingest_state()
+            state = self.document_processor.load_ingest_state()
             return {
                 "status": "skipped",
                 "message": "Knowledge file unchanged, no re-ingestion needed",
@@ -374,81 +658,34 @@ class AgenticRAG:
                 "file_hash": state.get("file_hash", ""),
             }
 
-        chunks = DocumentProcessor.process_file(KNOWLEDGE_FILE)
+        chunks = self.document_processor.process_file()
         self.vector_store.add_chunks(chunks)
 
-        file_hash = DocumentProcessor.compute_file_hash(KNOWLEDGE_FILE)
-        DocumentProcessor.save_ingest_state(
+        file_hash = self.document_processor.compute_file_hash(self.settings.knowledge_file)
+        self.document_processor.save_ingest_state(
             {
                 "file_hash": file_hash,
                 "chunk_count": len(chunks),
-                "last_ingested": str(os.path.getmtime(KNOWLEDGE_FILE)),
+                "last_ingested": self.settings.knowledge_file.stat().st_mtime,
             }
+        )
+
+        log_event(
+            logger,
+            "ingest_completed",
+            chunks=len(chunks),
+            force=force,
+            knowledge_file=str(self.settings.knowledge_file),
         )
 
         return {
             "status": "success",
-            "message": f"Ingested {len(chunks)} chunks from {KNOWLEDGE_FILE}",
+            "message": f"Ingested {len(chunks)} chunks from {self.settings.knowledge_file}",
             "chunks": len(chunks),
             "file_hash": file_hash,
         }
 
-    @staticmethod
-    def _supports_custom_temperature(model_name: str) -> bool:
-        # Azure GPT-5 chat deployments currently reject non-default temperature values.
-        return "gpt-5" not in model_name.lower()
-
-    def _chat_json(self, system_prompt: str, user_prompt: str, model: str = CHAT_MODEL) -> Dict[str, Any]:
-        chat_model = self._chat_model_name(model)
-        params: Dict[str, Any] = {
-            "model": chat_model,
-            "response_format": {"type": "json_object"},
-            "messages": [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt},
-            ],
-        }
-        if self._supports_custom_temperature(chat_model):
-            params["temperature"] = 0.1
-
-        response = openai_client.chat.completions.create(**params)
-        content = (response.choices[0].message.content or "{}").strip()
-        try:
-            return json.loads(content)
-        except json.JSONDecodeError:
-            return {}
-
-    def _chat_text(
-        self,
-        system_prompt: str,
-        user_prompt: str,
-        model: str = CHAT_MODEL,
-        temperature: float = CHAT_TEMPERATURE,
-        max_tokens: int = CHAT_MAX_TOKENS,
-    ) -> str:
-        chat_model = self._chat_model_name(model)
-        params: Dict[str, Any] = {
-            "model": chat_model,
-            "max_tokens": max_tokens,
-            "messages": [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt},
-            ],
-        }
-        if self._supports_custom_temperature(chat_model):
-            params["temperature"] = temperature
-
-        response = openai_client.chat.completions.create(**params)
-        return (response.choices[0].message.content or "").strip()
-
-    def _chat_model_name(self, fallback_model: str) -> str:
-        if USE_AZURE_OPENAI and AZURE_OPENAI_CHAT_DEPLOYMENT:
-            return AZURE_OPENAI_CHAT_DEPLOYMENT
-        if USE_AZURE_OPENAI and AZURE_OPENAI_DEPLOYMENT:
-            return AZURE_OPENAI_DEPLOYMENT
-        return fallback_model
-
-    def _detect_language(self, text: str) -> Tuple[str, float]:
+    def _detect_language(self, text: str) -> tuple[str, float]:
         if not text.strip():
             return "en", 0.0
         try:
@@ -459,58 +696,38 @@ class AgenticRAG:
             return _normalize_detected_language(best.lang), float(best.prob)
         except LangDetectException:
             return "en", 0.0
-        except Exception:
+        except Exception as error:
+            logger.debug("Language detection failed: %s", error)
             return "en", 0.0
+
+    # Map internal language codes to Google Translate language codes
+    _GOOGLE_LANG_MAP: dict[str, str] = {
+        "zh-Hans": "zh-CN",
+        "hi": "hi",
+        "ar": "ar",
+        "en": "en",
+    }
 
     def _translate_text(self, text: str, source_lang: str, target_lang: str) -> str:
         if not text or source_lang == target_lang:
             return text
 
-        source_label = LANGUAGE_LABELS.get(source_lang, source_lang)
-        target_label = LANGUAGE_LABELS.get(target_lang, target_lang)
-        system_prompt = (
-            "You are a faithful translator. Preserve meaning exactly, do not add facts, "
-            "and keep citation markers like [1], [2] unchanged."
-        )
-        user_prompt = (
-            f"Translate from {source_label} to {target_label}.\n\n"
-            f"Text:\n{text}"
-        )
-        return self._chat_text(
-            system_prompt=system_prompt,
-            user_prompt=user_prompt,
-            model=TRANSLATION_MODEL,
-            temperature=0.0,
-            max_tokens=max(300, len(text) * 2),
-        )
+        google_source = self._GOOGLE_LANG_MAP.get(source_lang, source_lang)
+        google_target = self._GOOGLE_LANG_MAP.get(target_lang, target_lang)
 
-    def _router_decision(self, query_en: str, chat_history: List[Dict[str, Any]]) -> RouterDecision:
-        query_lower = query_en.lower().strip()
-        for pattern in self.DIRECT_ANSWER_PATTERNS:
-            if re.search(pattern, query_lower):
-                return RouterDecision(
-                    action="DIRECT_ANSWER",
-                    reasoning="Greeting/social pattern matched.",
-                )
-
-        has_university_keyword = any(kw in query_lower for kw in self.RETRIEVAL_KEYWORDS)
-        if len(query_en.split()) < 3 and not has_university_keyword:
-            return RouterDecision(
-                action="CLARIFY",
-                reasoning="Query too vague.",
-                clarifying_question="Could you share more details about what you need help with on campus?",
+        try:
+            translated = GoogleTranslator(source=google_source, target=google_target).translate(text)
+            return translated if translated and translated.strip() else text
+        except Exception as error:
+            logger.warning(
+                "Google translation failed (%s→%s): %s", source_lang, target_lang, error
             )
+            return text
 
-        if has_university_keyword:
-            return RouterDecision(action="RETRIEVE", reasoning="University keyword found.")
-        return self._llm_router(query_en, chat_history)
-
-    def _llm_router(self, query_en: str, chat_history: List[Dict[str, Any]]) -> RouterDecision:
+    def _llm_router(self, query_en: str, chat_history: list[dict[str, Any]]) -> RouterDecision:
         recent = chat_history[-4:] if chat_history else []
-        history_text = "\n".join(
-            [f"{msg['role']}: {msg['content']}" for msg in recent]
-        )
-        result = self._chat_json(
+        history_text = "\n".join(f"{message['role']}: {message['content']}" for message in recent)
+        result = self.backend.chat_json(
             system_prompt=(
                 "You are a routing agent for a university assistant. Return JSON with "
                 "action (DIRECT_ANSWER|RETRIEVE|CLARIFY), reasoning, clarifying_question."
@@ -518,9 +735,12 @@ class AgenticRAG:
             user_prompt=(
                 f"Chat history:\n{history_text}\n\n"
                 f"Query: {query_en}\n"
-                "Choose RETRIEVE for university-specific facts, CLARIFY for vague input, "
-                "DIRECT_ANSWER for greeting/social/general intent."
+                "Default to RETRIEVE for student-facing university questions, processes, "
+                "services, links, or campus information even when broad. "
+                "Use CLARIFY only when the query is too underspecified to answer helpfully "
+                "after retrieval. Use DIRECT_ANSWER only for greeting/social/general intent."
             ),
+            model=self.settings.chat_model,
         )
         action = str(result.get("action", "RETRIEVE")).upper()
         if action not in {"DIRECT_ANSWER", "RETRIEVE", "CLARIFY"}:
@@ -531,34 +751,124 @@ class AgenticRAG:
             clarifying_question=result.get("clarifying_question"),
         )
 
-    def _direct_answer_en(self, query_en: str, chat_history: List[Dict[str, Any]]) -> Dict[str, Any]:
-        recent = chat_history[-4:] if chat_history else []
-        history_text = "\n".join(
-            [f"{msg['role']}: {msg['content']}" for msg in recent]
+    def _router_decision(self, query_en: str, chat_history: list[dict[str, Any]], was_translated: bool = False) -> RouterDecision:
+        query_lower = query_en.lower().strip()
+        for pattern in self.DIRECT_ANSWER_PATTERNS:
+            if re.search(pattern, query_lower):
+                return RouterDecision(
+                    action="DIRECT_ANSWER",
+                    reasoning="Greeting or social pattern matched.",
+                )
+
+        has_university_keyword = any(keyword in query_lower for keyword in self.RETRIEVAL_KEYWORDS)
+        has_broad_retrieval_intent = any(
+            re.search(pattern, query_lower) for pattern in self.BROAD_RETRIEVAL_PATTERNS
         )
-        result = self._chat_json(
+        # Skip the short-query vagueness check when the query was translated from another
+        # language — translations can be imperfect and produce short results even for
+        # valid questions, so go straight to retrieval instead of asking for clarification.
+        if not was_translated and len(query_en.split()) < 3 and not has_university_keyword:
+            return RouterDecision(
+                action="CLARIFY",
+                reasoning="Query too vague.",
+                clarifying_question="Could you share more details about what you need help with on campus?",
+            )
+
+        if has_university_keyword or has_broad_retrieval_intent:
+            return RouterDecision(
+                action="RETRIEVE",
+                reasoning="Student-facing retrieval intent detected.",
+            )
+        # For translated queries that don't match keywords, default to RETRIEVE
+        if was_translated:
+            return RouterDecision(
+                action="RETRIEVE",
+                reasoning="Translated query routed to retrieval.",
+            )
+        return self._llm_router(query_en, chat_history)
+
+    def _direct_answer_en(
+        self,
+        query_en: str,
+        chat_history: list[dict[str, Any]],
+        campus: str,
+    ) -> dict[str, Any]:
+        query_lower = query_en.lower().strip()
+        if re.search(r"^(hi|hello|hey|greetings)\b", query_lower):
+            return {
+                "answer_markdown": (
+                    f"Hi. I'm UniBot, a Heriot-Watt student assistant. I assume {campus} campus "
+                    "unless you tell me otherwise. I can help with "
+                    "academics, enrolment, timetables, wellbeing, accommodation, campus services, "
+                    "societies, sport, and fees."
+                ),
+                "follow_up_suggestions": [
+                    "Ask about enrolment or timetables.",
+                    "Ask about wellbeing or accommodation.",
+                    "Ask about societies, sport, or fees.",
+                ],
+                "needs_human_handoff": False,
+                "confidence": 0.9,
+            }
+        if re.search(r"what('s| is) your name|who are you", query_lower):
+            return {
+                "answer_markdown": (
+                    f"I'm UniBot, a Heriot-Watt student assistant. I assume {campus} campus unless "
+                    "you tell me otherwise. I help with university "
+                    "information such as academics, student support, accommodation, campus services, "
+                    "societies, sport, and fees."
+                ),
+                "follow_up_suggestions": [],
+                "needs_human_handoff": False,
+                "confidence": 0.9,
+            }
+        if re.search(r"thank", query_lower):
+            return {
+                "answer_markdown": (
+                    "You're welcome. If you need Heriot-Watt information, ask about academics, "
+                    "student support, accommodation, campus life, sport, or fees."
+                ),
+                "follow_up_suggestions": [],
+                "needs_human_handoff": False,
+                "confidence": 0.9,
+            }
+        if re.search(r"^(bye|goodbye)\b", query_lower):
+            return {
+                "answer_markdown": (
+                    "Goodbye. If you need Heriot-Watt help later, I can assist with academics, "
+                    "student support, accommodation, campus life, sport, and fees."
+                ),
+                "follow_up_suggestions": [],
+                "needs_human_handoff": False,
+                "confidence": 0.9,
+            }
+
+        recent = chat_history[-4:] if chat_history else []
+        history_text = "\n".join(f"{message['role']}: {message['content']}" for message in recent)
+        result = self.backend.chat_json(
             system_prompt=(
                 "You are a concise university assistant. Return JSON with keys: "
                 "answer_markdown, follow_up_suggestions (array), needs_human_handoff (bool), confidence (0-1)."
             ),
             user_prompt=(
+                f"Default campus context: {campus}. Assume this campus unless the user specifies another one.\n\n"
                 f"History:\n{history_text}\n\n"
                 f"User query: {query_en}\n"
                 "If factual data is unknown, say so clearly. Keep answer concise."
             ),
+            model=self.settings.chat_model,
         )
         answer = str(result.get("answer_markdown", "")).strip() or "How can I help you today?"
         follow_ups = result.get("follow_up_suggestions") or []
         if not isinstance(follow_ups, list):
             follow_ups = []
-        confidence = result.get("confidence", 0.45)
         try:
-            confidence = float(confidence)
+            confidence = float(result.get("confidence", 0.45))
         except (TypeError, ValueError):
             confidence = 0.45
         return {
             "answer_markdown": answer,
-            "follow_up_suggestions": [str(x) for x in follow_ups][:3],
+            "follow_up_suggestions": [str(item) for item in follow_ups][:3],
             "needs_human_handoff": bool(result.get("needs_human_handoff", False)),
             "confidence": max(0.0, min(1.0, confidence)),
         }
@@ -566,9 +876,10 @@ class AgenticRAG:
     def _grounded_answer_en(
         self,
         query_en: str,
-        relevant_chunks: List[RetrievedChunk],
-        chat_history: List[Dict[str, Any]],
-    ) -> Dict[str, Any]:
+        relevant_chunks: list[RetrievedChunk],
+        chat_history: list[dict[str, Any]],
+        campus: str,
+    ) -> dict[str, Any]:
         if not relevant_chunks:
             return {
                 "answer_markdown": (
@@ -584,18 +895,13 @@ class AgenticRAG:
                 "confidence": 0.25,
             }
 
-        evidence_lines = []
-        for idx, rc in enumerate(relevant_chunks, 1):
-            evidence_lines.append(
-                f"[{idx}] chunk_id={rc.chunk.chunk_id} source={rc.chunk.source}\n{rc.chunk.text}"
-            )
-        evidence_text = "\n\n".join(evidence_lines)
-
-        recent = chat_history[-6:] if chat_history else []
-        history_text = "\n".join(
-            [f"{msg['role']}: {msg['content']}" for msg in recent]
+        evidence_text = "\n\n".join(
+            f"[{index}] chunk_id={chunk.chunk.chunk_id} source={chunk.chunk.source}\n{chunk.chunk.text}"
+            for index, chunk in enumerate(relevant_chunks, start=1)
         )
-        result = self._chat_json(
+        recent = chat_history[-6:] if chat_history else []
+        history_text = "\n".join(f"{message['role']}: {message['content']}" for message in recent)
+        result = self.backend.chat_json(
             system_prompt=(
                 "You are a university RAG assistant. Return JSON with keys: "
                 "answer_markdown, follow_up_suggestions (array), needs_human_handoff (bool), confidence (0-1). "
@@ -604,10 +910,12 @@ class AgenticRAG:
                 "If evidence is missing, explicitly say that information is unavailable."
             ),
             user_prompt=(
+                f"Default campus context: {campus}. Assume this campus unless the user explicitly mentions another campus.\n\n"
                 f"Evidence:\n{evidence_text}\n\n"
                 f"History:\n{history_text}\n\n"
                 f"User query: {query_en}"
             ),
+            model=self.settings.chat_model,
         )
         answer = str(result.get("answer_markdown", "")).strip()
         if not answer:
@@ -621,41 +929,46 @@ class AgenticRAG:
             confidence = 0.7
         return {
             "answer_markdown": answer,
-            "follow_up_suggestions": [str(x) for x in follow_ups][:3],
+            "follow_up_suggestions": [str(item) for item in follow_ups][:3],
             "needs_human_handoff": bool(result.get("needs_human_handoff", False)),
             "confidence": max(0.0, min(1.0, confidence)),
         }
 
-    def _extract_citation_indices(self, answer_markdown: str, max_index: int) -> List[int]:
-        seen = set()
+    @staticmethod
+    def _extract_citation_indices(answer_markdown: str, max_index: int) -> list[int]:
+        seen: set[int] = set()
         for match in re.finditer(r"\[(\d+)\]", answer_markdown):
-            idx = int(match.group(1)) - 1
-            if 0 <= idx < max_index:
-                seen.add(idx)
+            index = int(match.group(1)) - 1
+            if 0 <= index < max_index:
+                seen.add(index)
         if not seen and max_index > 0:
             seen = {0}
         return sorted(seen)
 
     def _build_citation_payloads(
-        self, relevant_chunks: List[RetrievedChunk], answer_markdown: str
-    ) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
-        indices = self._extract_citation_indices(answer_markdown, len(relevant_chunks))
-        citations: List[Dict[str, Any]] = []
-        sources: List[Dict[str, Any]] = []
-        for idx in indices:
-            rc = relevant_chunks[idx]
+        self,
+        relevant_chunks: list[RetrievedChunk],
+        answer_markdown: str,
+    ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+        citations: list[dict[str, Any]] = []
+        sources: list[dict[str, Any]] = []
+        for index in self._extract_citation_indices(answer_markdown, len(relevant_chunks)):
+            retrieved_chunk = relevant_chunks[index]
             citations.append(
                 {
-                    "chunk_id": rc.chunk.chunk_id,
-                    "source_url": rc.chunk.source,
+                    "chunk_id": retrieved_chunk.chunk.chunk_id,
+                    "source_url": retrieved_chunk.chunk.source,
                 }
             )
+            excerpt = retrieved_chunk.chunk.text[:220]
+            if len(retrieved_chunk.chunk.text) > 220:
+                excerpt += "..."
             sources.append(
                 {
-                    "source": rc.chunk.source,
-                    "chunk_id": rc.chunk.chunk_id,
-                    "excerpt": rc.chunk.text[:220] + ("..." if len(rc.chunk.text) > 220 else ""),
-                    "score": round(float(rc.score), 4),
+                    "source": retrieved_chunk.chunk.source,
+                    "chunk_id": retrieved_chunk.chunk.chunk_id,
+                    "excerpt": excerpt,
+                    "score": round(float(retrieved_chunk.score), 4),
                 }
             )
         return citations, sources
@@ -663,51 +976,48 @@ class AgenticRAG:
     def chat(
         self,
         query: str,
-        session_id: Optional[str] = None,
+        session_id: str | None = None,
         ui_language: str = "en",
         auto_detect: bool = True,
-        campus: Optional[str] = None,
-        location_context: Optional[Dict[str, Any]] = None,
+        campus: str | None = None,
+        location_context: dict[str, Any] | None = None,
     ) -> RagResponse:
         conversation_id = session_id or str(uuid.uuid4())
-        if conversation_id not in self.sessions:
-            self.sessions[conversation_id] = []
-        history = self.sessions[conversation_id]
+        history = self.session_store.history_for(conversation_id)
+        effective_campus = _normalize_campus(campus)
 
-        normalized_ui_lang = _normalize_ui_language(ui_language)
-        detection_language = normalized_ui_lang
+        normalized_ui_language = _normalize_ui_language(ui_language)
+        detected_language = normalized_ui_language
         detection_confidence = 0.0
 
         if auto_detect:
-            locked = self.session_language_locks.get(conversation_id)
-            if locked in SUPPORTED_LANGUAGES:
-                effective_language = locked
+            locked_language = self.session_store.get_language_lock(conversation_id)
+            if locked_language in SUPPORTED_LANGUAGES:
+                effective_language = locked_language
             else:
-                detection_language, detection_confidence = self._detect_language(query)
+                detected_language, detection_confidence = self._detect_language(query)
                 if (
-                    detection_language in SUPPORTED_LANGUAGES
-                    and detection_confidence >= LANGUAGE_DETECTION_CONFIDENCE_THRESHOLD
+                    detected_language in SUPPORTED_LANGUAGES
+                    and detection_confidence >= self.settings.language_detection_confidence_threshold
                 ):
-                    effective_language = detection_language
+                    effective_language = detected_language
                 else:
-                    effective_language = normalized_ui_lang
-                self.session_language_locks[conversation_id] = effective_language
+                    effective_language = normalized_ui_language
+                self.session_store.set_language_lock(conversation_id, effective_language)
         else:
-            self.session_language_locks.pop(conversation_id, None)
-            effective_language = normalized_ui_lang
+            self.session_store.clear_language_lock(conversation_id)
+            effective_language = normalized_ui_language
 
-        print(
-            json.dumps(
-                {
-                    "event": "language_resolution",
-                    "conversation_id": conversation_id,
-                    "ui_language": normalized_ui_lang,
-                    "auto_detect": auto_detect,
-                    "detected_language": detection_language,
-                    "detection_confidence": round(detection_confidence, 4),
-                    "effective_language": effective_language,
-                }
-            )
+        log_event(
+            logger,
+            "language_resolution",
+            conversation_id=conversation_id,
+            ui_language=normalized_ui_language,
+            auto_detect=auto_detect,
+            campus=effective_campus,
+            detected_language=detected_language,
+            detection_confidence=round(detection_confidence, 4),
+            effective_language=effective_language,
         )
 
         translation_notice = ""
@@ -715,28 +1025,24 @@ class AgenticRAG:
         if effective_language != "en":
             try:
                 query_en = self._translate_text(query, effective_language, "en")
-            except Exception as exc:
-                print(
-                    json.dumps(
-                        {
-                            "event": "translation_error",
-                            "stage": "query_to_en",
-                            "conversation_id": conversation_id,
-                            "error": str(exc),
-                        }
-                    )
-                )
-                effective_language = "en"
+            except Exception as error:
                 translation_notice = "Note: translation failed, so I replied in English."
+                effective_language = "en"
                 query_en = query
+                log_event(
+                    logger,
+                    "translation_error",
+                    level=logging.WARNING,
+                    stage="query_to_en",
+                    conversation_id=conversation_id,
+                    error=str(error),
+                )
 
-        decision = self._router_decision(query_en, history)
-        relevant_chunks: List[RetrievedChunk] = []
+        decision = self._router_decision(query_en, history, was_translated=effective_language != "en")
+        relevant_chunks: list[RetrievedChunk] = []
 
         if decision.action == "CLARIFY":
-            clarifying = decision.clarifying_question or (
-                "Could you share more details so I can help accurately?"
-            )
+            clarifying = decision.clarifying_question or "Could you share more details so I can help accurately?"
             answer_payload = {
                 "answer_markdown": "",
                 "follow_up_suggestions": [],
@@ -745,20 +1051,45 @@ class AgenticRAG:
             }
         elif decision.action == "DIRECT_ANSWER":
             clarifying = None
-            answer_payload = self._direct_answer_en(query_en, history)
+            answer_payload = self._direct_answer_en(query_en, history, effective_campus)
         else:
             clarifying = None
             retrieved = self.vector_store.search(
                 query=query_en,
-                top_k=TOP_K,
-                campus=campus,
+                top_k=self.settings.top_k,
+                campus=effective_campus,
                 category=(location_context or {}).get("category") if location_context else None,
             )
-            relevant_chunks = [c for c in retrieved if c.score >= SIMILARITY_THRESHOLD]
+            # For non-English queries, always also search with the original query.
+            # text-embedding-3-small has strong multilingual support, so the original
+            # query often finds relevant chunks even when translation is imperfect or
+            # the translated text is identical to the original (translation failure).
+            if effective_language != "en":
+                retrieved_orig = self.vector_store.search(
+                    query=query,
+                    top_k=self.settings.top_k,
+                    campus=effective_campus,
+                    category=(location_context or {}).get("category") if location_context else None,
+                )
+                # Merge: keep best score per chunk_id
+                seen: dict[str, RetrievedChunk] = {r.chunk.chunk_id: r for r in retrieved}
+                for r in retrieved_orig:
+                    if r.chunk.chunk_id not in seen or r.score > seen[r.chunk.chunk_id].score:
+                        seen[r.chunk.chunk_id] = r
+                retrieved = sorted(seen.values(), key=lambda x: x.score, reverse=True)[: self.settings.top_k]
+            relevant_chunks = [
+                chunk
+                for chunk in retrieved
+                if chunk.score >= self.settings.similarity_threshold
+            ]
             if not relevant_chunks:
                 relevant_chunks = retrieved[:3]
-
-            answer_payload = self._grounded_answer_en(query_en, relevant_chunks, history)
+            answer_payload = self._grounded_answer_en(
+                query_en,
+                relevant_chunks,
+                history,
+                effective_campus,
+            )
 
         answer_markdown = answer_payload["answer_markdown"]
         follow_ups = answer_payload.get("follow_up_suggestions", [])
@@ -770,28 +1101,26 @@ class AgenticRAG:
         if effective_language != "en":
             try:
                 if answer_markdown:
-                    answer_markdown = self._translate_text(answer_markdown, "en", effective_language)
+                    translated = self._translate_text(answer_markdown, "en", effective_language)
+                    answer_markdown = translated if translated.strip() else answer_markdown
                 if clarifying:
-                    clarifying = self._translate_text(clarifying, "en", effective_language)
-                translated_follow_ups = []
-                for suggestion in follow_ups[:3]:
-                    translated_follow_ups.append(
-                        self._translate_text(str(suggestion), "en", effective_language)
-                    )
-                follow_ups = translated_follow_ups
-            except Exception as exc:
-                print(
-                    json.dumps(
-                        {
-                            "event": "translation_error",
-                            "stage": "answer_from_en",
-                            "conversation_id": conversation_id,
-                            "error": str(exc),
-                        }
-                    )
-                )
+                    translated_clarifying = self._translate_text(clarifying, "en", effective_language)
+                    clarifying = translated_clarifying if translated_clarifying.strip() else clarifying
+                follow_ups = [
+                    self._translate_text(str(suggestion), "en", effective_language)
+                    for suggestion in follow_ups[:3]
+                ]
+            except Exception as error:
                 effective_language = "en"
                 translation_notice = "Note: translation failed, so I replied in English."
+                log_event(
+                    logger,
+                    "translation_error",
+                    level=logging.WARNING,
+                    stage="answer_from_en",
+                    conversation_id=conversation_id,
+                    error=str(error),
+                )
 
         if translation_notice:
             if answer_markdown:
@@ -799,34 +1128,27 @@ class AgenticRAG:
             else:
                 answer_markdown = translation_notice
 
-        print(
-            json.dumps(
-                {
-                    "event": "rag_summary",
-                    "conversation_id": conversation_id,
-                    "action": decision.action,
-                    "used_retrieval": decision.action == "RETRIEVE",
-                    "retrieved_count": len(relevant_chunks),
-                    "confidence": round(confidence, 4),
-                    "effective_language": effective_language,
-                }
-            )
+        log_event(
+            logger,
+            "rag_summary",
+            conversation_id=conversation_id,
+            action=decision.action,
+            used_retrieval=decision.action == "RETRIEVE",
+            retrieved_count=len(relevant_chunks),
+            confidence=round(confidence, 4),
+            effective_language=effective_language,
+            reasoning=decision.reasoning,
         )
 
-        if answer_markdown:
-            history.append({"role": "user", "content": query_en})
-            history.append({"role": "assistant", "content": answer_markdown})
-        elif clarifying:
-            history.append({"role": "user", "content": query_en})
-            history.append({"role": "assistant", "content": clarifying})
-        if len(history) > 20:
-            self.sessions[conversation_id] = history[-20:]
+        persisted_message = answer_markdown or clarifying
+        if persisted_message:
+            self.session_store.append_exchange(conversation_id, query_en, persisted_message)
 
-        response = RagResponse(
+        return RagResponse(
             answer_markdown=answer_markdown,
             effective_language=effective_language,
             citations=citations,
-            follow_up_suggestions=[str(x) for x in follow_ups][:3],
+            follow_up_suggestions=[str(item) for item in follow_ups][:3],
             needs_human_handoff=needs_handoff,
             confidence=max(0.0, min(1.0, confidence)),
             answer=answer_markdown,
@@ -837,23 +1159,30 @@ class AgenticRAG:
             session_id=conversation_id,
             detection_confidence=detection_confidence,
         )
-        return response
 
-    def get_session_history(self, session_id: str) -> List[Dict[str, Any]]:
-        return self.sessions.get(session_id, [])
+    def get_session_history(self, session_id: str) -> list[dict[str, Any]]:
+        return self.session_store.history_for(session_id)
 
-    def clear_session(self, session_id: str):
-        if session_id in self.sessions:
-            del self.sessions[session_id]
-        if session_id in self.session_language_locks:
-            del self.session_language_locks[session_id]
+    def clear_session(self, session_id: str) -> None:
+        self.session_store.clear(session_id)
 
 
-rag_instance: Optional[AgenticRAG] = None
+rag_instance: AgenticRAG | None = None
+_rag_lock = threading.Lock()
 
 
 def get_rag() -> AgenticRAG:
     global rag_instance
-    if rag_instance is None:
-        rag_instance = AgenticRAG()
+    if rag_instance is not None:
+        return rag_instance
+
+    with _rag_lock:
+        if rag_instance is None:
+            rag_instance = AgenticRAG.from_settings(get_settings())
     return rag_instance
+
+
+def reset_rag() -> None:
+    global rag_instance
+    with _rag_lock:
+        rag_instance = None

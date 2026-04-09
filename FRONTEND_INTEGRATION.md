@@ -23,12 +23,12 @@ Your existing code already works! The backend returns `{answer: "..."}` which ma
 
 **Step 1:** Start the backend:
 ```bash
-cd agentic_rag
-python -m venv venv
-venv\Scripts\activate
-pip install -r requirements.txt
-# Create .env file with your API keys
-python main.py
+cd UniBot
+python -m venv .venv
+.venv\Scripts\activate
+pip install -r agentic_rag\requirements.txt
+copy agentic_rag\.env.example agentic_rag\.env
+python -m agentic_rag
 ```
 
 **Step 2:** Replace your entire `ChatPage` component (around line 265 in index.html) with the [Complete ChatPage Component](#complete-chatpage-component) below.
@@ -459,7 +459,7 @@ Access to fetch at 'http://localhost:8000/rag-chat' from origin 'null' has been 
 
 2. **Use VS Code Live Server extension**
 
-3. **Verify CORS is enabled in backend** (`agentic_rag/main.py`):
+3. **Verify CORS is enabled in backend** (`agentic_rag/app.py`):
    ```python
    app.add_middleware(
        CORSMiddleware,
@@ -520,8 +520,8 @@ Should return:
 
 **If not running:**
 ```bash
-cd agentic_rag
-python main.py
+cd UniBot
+python -m agentic_rag
 ```
 
 ### API Key Errors
@@ -533,9 +533,9 @@ python main.py
 
 **Fix:**
 ```bash
-cd agentic_rag
-cp .env.example .env
-# Edit .env and add your keys
+cd UniBot
+copy agentic_rag\.env.example agentic_rag\.env
+# Edit agentic_rag\.env and add your keys
 ```
 
 ---

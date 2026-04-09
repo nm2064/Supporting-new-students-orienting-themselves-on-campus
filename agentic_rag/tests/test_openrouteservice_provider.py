@@ -1,4 +1,4 @@
-from maps.providers.openrouteservice_provider import OpenRouteServiceProvider
+from agentic_rag.maps.providers.openrouteservice_provider import OpenRouteServiceProvider
 
 
 def test_parse_geojson_route_returns_canonical_schema():

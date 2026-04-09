@@ -1,14 +1,20 @@
 import asyncio
-import json
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-import maps.router as maps_router
-from maps.cache import TTLCache
-from maps.models import PlaceDetail, RouteGeometry, RouteRequest, RouteResponse, RouteStep
-from maps.places_store import PlacesStore
-from maps.service import MapsService, NoopInstructionTranslator, RoutingUnavailable
+from agentic_rag.maps import router as maps_router
+from agentic_rag.maps.cache import TTLCache
+from agentic_rag.maps.models import (
+    PlaceDetail,
+    RouteGeometry,
+    RouteRequest,
+    RouteResponse,
+    RouteStep,
+)
+from agentic_rag.maps.places_store import PlacesStore
+from agentic_rag.maps.service import MapsService, NoopInstructionTranslator, RoutingUnavailable
 
 
 class FakeService:
@@ -89,6 +95,9 @@ def _client_for_service(service):
     return TestClient(app)
 
 
+FIXTURE_PATH = Path(__file__).resolve().parent / "places_fixture.json"
+
+
 def test_route_success_returns_canonical_schema():
     client = _client_for_service(FakeService())
 
@@ -141,26 +150,8 @@ def test_places_search_and_lookup():
     assert missing_response.status_code == 404
 
 
-def test_route_cache_hit_on_second_identical_call(tmp_path):
-    dataset_path = tmp_path / "places.json"
-    dataset_path.write_text(
-        json.dumps(
-            [
-                {
-                    "id": "a",
-                    "name": "A",
-                    "lat": 55.9,
-                    "lng": -3.3,
-                    "campus": "edinburgh",
-                    "type": "poi",
-                    "tags": [],
-                    "metadata": {},
-                }
-            ]
-        ),
-        encoding="utf-8",
-    )
-
+def test_route_cache_hit_on_second_identical_call():
+    dataset_path = FIXTURE_PATH
     provider = CountingProvider()
     real_service = MapsService(
         places_store=PlacesStore(str(dataset_path)),

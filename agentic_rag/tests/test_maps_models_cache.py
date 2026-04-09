@@ -1,9 +1,9 @@
 import pytest
 from pydantic import ValidationError
 
-from maps.cache import build_route_cache_key
-from maps.models import Coord, Locale, Profile, RouteRequest
-from maps.rate_limit import FixedWindowRateLimiter
+from agentic_rag.maps.cache import build_route_cache_key
+from agentic_rag.maps.models import Coord, Locale, Profile, RouteRequest
+from agentic_rag.maps.rate_limit import FixedWindowRateLimiter
 
 
 def test_coord_validation_rejects_out_of_range_latitude():

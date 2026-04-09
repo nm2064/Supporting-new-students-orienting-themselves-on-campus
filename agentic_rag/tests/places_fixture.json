@@ -1,0 +1,12 @@
+[
+  {
+    "id": "lib",
+    "name": "Library",
+    "lat": 55.9,
+    "lng": -3.3,
+    "campus": "edinburgh",
+    "type": "library",
+    "tags": ["study"],
+    "metadata": {}
+  }
+]
