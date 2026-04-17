@@ -1,0 +1,765 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>UniBot - Honours Project Presentation</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0f172a;
+    --bg-card: #1e293b;
+    --accent: #38bdf8;
+    --accent2: #a78bfa;
+    --accent3: #34d399;
+    --text: #f1f5f9;
+    --text-muted: #94a3b8;
+    --border: #334155;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Inter', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    overflow: hidden;
+    height: 100vh;
+    width: 100vw;
+  }
+
+  /* ── Slide container ── */
+  .deck { position: relative; width: 100vw; height: 100vh; }
+
+  .slide {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column;
+    justify-content: center; align-items: center;
+    padding: 60px 80px;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: opacity .35s ease, visibility 0s .35s;
+    z-index: 0;
+  }
+  .slide.active { opacity: 1; visibility: visible; pointer-events: auto; transition: opacity .35s ease, visibility 0s 0s; z-index: 1; }
+
+  /* ── Typography ── */
+  h1 { font-size: 2.8rem; font-weight: 700; line-height: 1.2; margin-bottom: 12px; }
+  h2 { font-size: 2rem; font-weight: 600; margin-bottom: 28px; color: var(--accent); }
+  h3 { font-size: 1.3rem; font-weight: 600; margin-bottom: 10px; }
+  p, li { font-size: 1.15rem; line-height: 1.7; color: var(--text-muted); }
+  ul { list-style: none; padding: 0; }
+  ul li { padding-left: 24px; position: relative; margin-bottom: 12px; }
+  ul li::before {
+    content: '';
+    position: absolute; left: 0; top: 10px;
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--accent);
+  }
+  strong { color: var(--text); font-weight: 600; }
+
+  /* ── Layout helpers ── */
+  .content { max-width: 1100px; width: 100%; }
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 48px; align-items: start; }
+  .three-col { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 32px; }
+
+  .card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 28px;
+  }
+
+  .stat-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px 28px;
+    text-align: center;
+  }
+  .stat-card .number {
+    font-size: 2.6rem;
+    font-weight: 700;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .stat-card .label { font-size: 0.9rem; color: var(--text-muted); margin-top: 6px; }
+
+  .tag {
+    display: inline-block;
+    font-size: 0.8rem;
+    font-weight: 500;
+    padding: 4px 12px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    margin-right: 6px;
+    margin-bottom: 6px;
+  }
+  .tag.accent { border-color: var(--accent); color: var(--accent); }
+  .tag.green { border-color: var(--accent3); color: var(--accent3); }
+  .tag.purple { border-color: var(--accent2); color: var(--accent2); }
+
+  /* ── Screenshot frames ── */
+  .screenshot {
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    max-width: 100%;
+    max-height: 380px;
+    object-fit: contain;
+    box-shadow: 0 4px 24px rgba(0,0,0,.4);
+  }
+  .screenshot-lg {
+    max-height: 450px;
+  }
+
+  /* ── Title slide ── */
+  .slide-title { text-align: center; }
+  .slide-title h1 { font-size: 3.2rem; margin-bottom: 8px; }
+  .slide-title .subtitle {
+    font-size: 1.3rem;
+    color: var(--accent);
+    font-weight: 400;
+    margin-bottom: 32px;
+  }
+  .slide-title .meta {
+    font-size: 1rem;
+    color: var(--text-muted);
+    line-height: 1.8;
+  }
+
+  /* ── Table ── */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 1rem;
+  }
+  th {
+    text-align: left;
+    padding: 10px 16px;
+    border-bottom: 2px solid var(--accent);
+    font-weight: 600;
+    color: var(--text);
+    font-size: 0.95rem;
+  }
+  td {
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--border);
+    color: var(--text-muted);
+  }
+  tr:last-child td { border-bottom: none; }
+  .highlight-row td {
+    color: var(--accent);
+    font-weight: 600;
+  }
+
+  /* ── Tier boxes ── */
+  .tier {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 18px 24px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: var(--bg-card);
+    margin-bottom: 14px;
+  }
+  .tier-num {
+    font-size: 1.4rem;
+    font-weight: 700;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    flex-shrink: 0;
+  }
+  .tier-1 .tier-num { background: rgba(56,189,248,0.15); color: var(--accent); }
+  .tier-2 .tier-num { background: rgba(167,139,250,0.15); color: var(--accent2); }
+  .tier-3 .tier-num { background: rgba(52,211,153,0.15); color: var(--accent3); }
+  .tier-info h3 { margin-bottom: 2px; font-size: 1.05rem; }
+  .tier-info p { font-size: 0.9rem; margin: 0; }
+
+  /* ── Flow arrow ── */
+  .flow-row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+    justify-content: center;
+    margin-bottom: 24px;
+  }
+  .flow-step {
+    padding: 10px 20px;
+    border-radius: 8px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    font-size: 0.95rem;
+    font-weight: 500;
+    color: var(--text);
+  }
+  .flow-arrow { color: var(--accent); font-size: 1.2rem; }
+
+  /* ── Progress bar ── */
+  .progress {
+    position: fixed; bottom: 0; left: 0;
+    height: 3px;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    transition: width .4s ease;
+    z-index: 100;
+  }
+
+  /* ── Slide counter ── */
+  .counter {
+    position: fixed;
+    bottom: 16px; right: 28px;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    z-index: 100;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ── Nav hint ── */
+  .nav-hint {
+    position: fixed;
+    bottom: 16px; left: 28px;
+    font-size: 0.8rem;
+    color: var(--border);
+    z-index: 100;
+  }
+
+  /* ── Section divider ── */
+  .section-num {
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: var(--accent);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+
+  /* ── Quote ── */
+  blockquote {
+    border-left: 3px solid var(--accent);
+    padding-left: 20px;
+    margin: 16px 0;
+    font-style: italic;
+    color: var(--text-muted);
+    font-size: 1.05rem;
+  }
+  blockquote cite {
+    display: block;
+    font-style: normal;
+    font-size: 0.85rem;
+    color: var(--border);
+    margin-top: 6px;
+  }
+
+  /* ── Comparison row ── */
+  .compare-bar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+  .compare-label { width: 130px; font-size: 0.9rem; color: var(--text-muted); }
+  .bar-track {
+    flex: 1;
+    height: 28px;
+    background: var(--bg);
+    border-radius: 6px;
+    overflow: hidden;
+    position: relative;
+  }
+  .bar-fill {
+    height: 100%;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    padding-left: 10px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--bg);
+  }
+  .bar-a { background: var(--accent); }
+  .bar-b { background: var(--border); }
+</style>
+</head>
+<body>
+<div class="deck" id="deck">
+
+  <!-- ============================================================ -->
+  <!-- SLIDE 1 — TITLE -->
+  <!-- ============================================================ -->
+  <div class="slide active slide-title" data-slide="0">
+    <div class="content">
+      <p class="section-num">Honours Project 2025–26</p>
+      <h1>UniBot</h1>
+      <p class="subtitle">Supporting New Students Orienting Themselves on Campus</p>
+      <div class="meta">
+        <p><strong>Noman Maqsudi</strong> &nbsp;·&nbsp; H00406480</p>
+        <p>BSc (Hons) Computer Science</p>
+        <p>Supervisor: Dr. Marta Romeo</p>
+        <p style="margin-top:12px;">
+          <span class="tag accent">RAG</span>
+          <span class="tag purple">Multilingual</span>
+          <span class="tag green">Campus Navigation</span>
+          <span class="tag">FastAPI</span>
+          <span class="tag">React</span>
+          <span class="tag">ChromaDB</span>
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- SLIDE 2 — PROBLEM & MOTIVATION -->
+  <!-- ============================================================ -->
+  <div class="slide" data-slide="1">
+    <div class="content">
+      <p class="section-num">01 &nbsp;·&nbsp; Motivation</p>
+      <h2>The Onboarding Challenge</h2>
+      <div class="two-col">
+        <div>
+          <ul>
+            <li><strong>~38% international students</strong> from 150+ countries face language barriers, cultural adjustment, and information overload</li>
+            <li><strong>Welcome Week is time-limited</strong> - event-based onboarding fades, and students forget where to find key info</li>
+            <li><strong>Information is scattered</strong> across hw.ac.uk, Watt Living, HWUnion, Sports Union - no single point of truth</li>
+            <li><strong>No native-language support</strong> on the existing website, leaving non-English speakers searching in an unfamiliar language</li>
+          </ul>
+        </div>
+        <div>
+          <div class="card" style="margin-bottom:20px;">
+            <h3 style="color:var(--accent);">Opportunity</h3>
+            <p>An AI-driven assistant combining <strong>RAG</strong> with verified HWU data can provide <strong>continuous, personalised, multilingual</strong> support — available 24/7, not just during Welcome Week.</p>
+          </div>
+          <div class="card">
+            <h3 style="color:var(--accent2);">Gap in Existing Solutions</h3>
+            <p>Few university onboarding systems integrate verified institutional data, multilingual AI translation, or sustained engagement beyond initial orientation.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- SLIDE 3 — AIM & OBJECTIVES -->
+  <!-- ============================================================ -->
+  <div class="slide" data-slide="2">
+    <div class="content">
+      <p class="section-num">02 &nbsp;·&nbsp; Aim</p>
+      <h2>Aim & Contributions</h2>
+      <p style="font-size:1.1rem; margin-bottom: 28px;">Enhance new and international students' onboarding at HWU through an AI assistant providing <strong>personalised, multilingual, context-aware</strong> support.</p>
+      <div class="three-col">
+        <div class="card">
+          <h3 style="color:var(--accent);">1. Agentic RAG Pipeline</h3>
+          <p>Three-tier query routing - pattern matching → keyword detection → LLM fallback - reducing API costs by ~85%</p>
+        </div>
+        <div class="card">
+          <h3 style="color:var(--accent2);">2. Multilingual Support</h3>
+          <p>Translate → Retrieve → Generate → Translate pipeline across 4 languages with session language locking</p>
+        </div>
+        <div class="card">
+          <h3 style="color:var(--accent3);">3. Campus Navigation</h3>
+          <p>Interactive Leaflet.js maps with OpenRouteService routing and translated turn-by-turn directions</p>
+        </div>
+      </div>
+      <div style="margin-top:24px; display:flex; gap:16px;">
+        <div class="card" style="flex:1;">
+          <h3>4. Automated Knowledge Ingestion</h3>
+          <p>Web crawler across 4 HWU domains with recursive chunking (300 tokens, 50-token overlap) and de-duplication via MD5 hashing</p>
+        </div>
+        <div class="card" style="flex:1;">
+          <h3>5. Evidence-Grounded Generation</h3>
+          <p>Source citations on every response with clickable URLs — 0% hallucination rate in evaluation</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- SLIDE 4 — ARCHITECTURE -->
+  <!-- ============================================================ -->
+  <div class="slide" data-slide="3">
+    <div class="content">
+      <p class="section-num">03 &nbsp;·&nbsp; Approach</p>
+      <h2>System Architecture</h2>
+      <div class="two-col">
+        <div>
+          <div class="card" style="margin-bottom:16px;">
+            <h3 style="color:var(--accent);">Interface Layer</h3>
+            <p>React 18 SPA · Tailwind CSS · Dark mode · Responsive · Leaflet.js maps · Language selector with auto-detect</p>
+          </div>
+          <div class="card" style="margin-bottom:16px;">
+            <h3 style="color:var(--accent2);">Processing Layer</h3>
+            <p>FastAPI backend · Agentic RAG orchestrator · Language detection · Query routing · Citation extraction · OpenAI API (GPT-4o-mini + text-embedding-3-small)</p>
+          </div>
+          <div class="card">
+            <h3 style="color:var(--accent3);">Data Layer</h3>
+            <p>ChromaDB vector store (HNSW indexing, cosine similarity) · Campus places JSON · OpenRouteService routing</p>
+          </div>
+        </div>
+        <div>
+          <h3 style="margin-bottom:12px; color:var(--text-muted);">Key Design Decisions</h3>
+          <ul>
+            <li><strong>ChromaDB over FAISS</strong> - built-in persistence; no manual serialisation needed for rapid prototyping</li>
+            <li><strong>Direct OpenAI over Azure</strong> - simpler config at prototype scale; Azure support retained via flag</li>
+            <li><strong>Single English KB</strong> - one ingestion pass; no cross-lingual embedding misalignment; translate at boundaries instead</li>
+            <li><strong>OpenRouteService over Google Maps</strong> - open-source, free to self-host; no per-request billing</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- SLIDE 5 — AGENTIC ROUTING -->
+  <!-- ============================================================ -->
+  <div class="slide" data-slide="4">
+    <div class="content">
+      <p class="section-num">03 &nbsp;·&nbsp; Approach</p>
+      <h2>Three-Tier Agentic Query Routing</h2>
+      <p style="margin-bottom:24px;">The primary technical contribution - autonomous routing that progressively escalates from fast, deterministic rules to LLM reasoning only when necessary.</p>
+      <div style="max-width:700px;">
+        <div class="tier tier-1">
+          <div class="tier-num">1</div>
+          <div class="tier-info">
+            <h3>Pattern Matching <span class="tag accent" style="margin-left:8px;">~15% of queries</span></h3>
+            <p>Regex detects greetings, farewells, social queries → pre-composed responses. <strong>Zero LLM cost.</strong></p>
+          </div>
+        </div>
+        <div class="tier tier-2">
+          <div class="tier-num">2</div>
+          <div class="tier-info">
+            <h3>Keyword & Intent Detection <span class="tag purple" style="margin-left:8px;">~70% of queries</span></h3>
+            <p>40+ university keywords (library, visa, exam, society…) and intent patterns. Routes directly to retrieval. <strong>Zero LLM cost.</strong></p>
+          </div>
+        </div>
+        <div class="tier tier-3">
+          <div class="tier-num">3</div>
+          <div class="tier-info">
+            <h3>LLM Routing <span class="tag green" style="margin-left:8px;">~10-15% of queries</span></h3>
+            <p>Fallback for ambiguous/compound queries. Returns structured JSON with action + reasoning. Uses last 4 messages for context.</p>
+          </div>
+        </div>
+      </div>
+      <p style="margin-top:20px; font-size:0.95rem;">
+        <strong>Result:</strong> ~85% of queries resolved deterministically - saving cost, reducing latency (1–3s per LLM call avoided), and preserving rate-limited API capacity.
+      </p>
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- SLIDE 6 — MULTILINGUAL PIPELINE -->
+  <!-- ============================================================ -->
+  <div class="slide" data-slide="5">
+    <div class="content">
+      <p class="section-num">03 &nbsp;·&nbsp; Approach</p>
+      <h2>Multilingual Pipeline & Campus Navigation</h2>
+      <div class="two-col">
+        <div>
+          <h3 style="color:var(--accent); margin-bottom:16px;">Translate → Retrieve → Generate → Translate</h3>
+          <div class="flow-row" style="justify-content:flex-start;">
+            <div class="flow-step">User query (any lang)</div>
+            <span class="flow-arrow">→</span>
+            <div class="flow-step">Translate to EN</div>
+            <span class="flow-arrow">→</span>
+            <div class="flow-step">Retrieve from EN KB</div>
+          </div>
+          <div class="flow-row" style="justify-content:flex-start;">
+            <div class="flow-step">Generate response</div>
+            <span class="flow-arrow">→</span>
+            <div class="flow-step">Translate back</div>
+            <span class="flow-arrow">→</span>
+            <div class="flow-step">User's language</div>
+          </div>
+          <ul style="margin-top:16px;">
+            <li><strong>4 languages:</strong> English, Simplified Chinese, Hindi, Modern Standard Arabic</li>
+            <li><strong>Session language locking</strong> on first high-confidence detection (threshold 0.9)</li>
+            <li><strong>Citation markers preserved</strong> through translation boundaries</li>
+            <li><strong>Graceful fallback</strong> to English if translation fails</li>
+          </ul>
+        </div>
+        <div>
+          <h3 style="color:var(--accent3); margin-bottom:16px;">Campus Navigation</h3>
+          <ul>
+            <li><strong>20+ campus locations</strong> with geodata (Edinburgh campus)</li>
+            <li><strong>Fuzzy place search</strong> using SequenceMatcher scoring hierarchy</li>
+            <li><strong>Walking, cycling, driving</strong> routes via OpenRouteService</li>
+            <li><strong>TTL cache</strong> with LRU eviction - 300s TTL, 1000-entry capacity, thread-safe</li>
+            <li><strong>Translated directions</strong> for non-English sessions</li>
+            <li><strong>Rate limiting:</strong> 30 routes / 60 searches per minute</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- SLIDE 7 — DEMO / SCREENSHOTS -->
+  <!-- ============================================================ -->
+  <div class="slide" data-slide="6">
+    <div class="content">
+      <p class="section-num">04 &nbsp;·&nbsp; Results & Demo</p>
+      <h2>The System in Action</h2>
+      <div class="three-col" style="align-items:start;">
+        <div style="text-align:center;">
+          <img src="images/unibot_chat_interface.png" alt="Chat Interface" class="screenshot"
+               onerror="this.style.display='none';this.nextElementSibling.style.display='flex';">
+          <div style="display:none; height:280px; align-items:center; justify-content:center; background:var(--bg-card); border-radius:10px; border:1px solid var(--border);">
+            <p style="color:var(--text-muted); font-size:0.9rem;">Chat Interface Screenshot</p>
+          </div>
+          <p style="margin-top:10px; font-size:0.85rem; color:var(--text-muted);">Chat with citations & follow-ups</p>
+        </div>
+        <div style="text-align:center;">
+          <img src="images/unibot_multilingual_chat.png" alt="Multilingual Chat" class="screenshot"
+               onerror="this.style.display='none';this.nextElementSibling.style.display='flex';">
+          <div style="display:none; height:280px; align-items:center; justify-content:center; background:var(--bg-card); border-radius:10px; border:1px solid var(--border);">
+            <p style="color:var(--text-muted); font-size:0.9rem;">Multilingual Chat Screenshot</p>
+          </div>
+          <p style="margin-top:10px; font-size:0.85rem; color:var(--text-muted);">Multilingual response (Chinese)</p>
+        </div>
+        <div style="text-align:center;">
+          <img src="images/unibot_map_interface.png" alt="Map Interface" class="screenshot"
+               onerror="this.style.display='none';this.nextElementSibling.style.display='flex';">
+          <div style="display:none; height:280px; align-items:center; justify-content:center; background:var(--bg-card); border-radius:10px; border:1px solid var(--border);">
+            <p style="color:var(--text-muted); font-size:0.9rem;">Map Interface Screenshot</p>
+          </div>
+          <p style="margin-top:10px; font-size:0.85rem; color:var(--text-muted);">Campus map with routing</p>
+        </div>
+      </div>
+      <p style="margin-top:20px; text-align:center; font-size:0.95rem; color:var(--text-muted);">
+        React 18 SPA &nbsp;·&nbsp; Dark mode &nbsp;·&nbsp; Responsive layout &nbsp;·&nbsp; Source citations with clickable URLs &nbsp;·&nbsp; Follow-up suggestions
+      </p>
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- SLIDE 8 — EVALUATION RESULTS -->
+  <!-- ============================================================ -->
+  <div class="slide" data-slide="7">
+    <div class="content">
+      <p class="section-num">04 &nbsp;·&nbsp; Results</p>
+      <h2>Evaluation Results</h2>
+      <div style="display:grid; grid-template-columns: repeat(5,1fr); gap:16px; margin-bottom:28px;">
+        <div class="stat-card">
+          <div class="number">86.0</div>
+          <div class="label">SUS Score<br>("Excellent")</div>
+        </div>
+        <div class="stat-card">
+          <div class="number">100%</div>
+          <div class="label">Task Success<br>(50/50 tasks)</div>
+        </div>
+        <div class="stat-card">
+          <div class="number">0%</div>
+          <div class="label">Hallucination<br>Rate</div>
+        </div>
+        <div class="stat-card">
+          <div class="number">2.8×</div>
+          <div class="label">Faster than<br>HWU website</div>
+        </div>
+        <div class="stat-card">
+          <div class="number">100%</div>
+          <div class="label">Citation<br>Rate</div>
+        </div>
+      </div>
+      <div class="two-col">
+        <div>
+          <h3 style="margin-bottom:12px;">UniBot vs. HWU Website (within-subjects, n=10)</h3>
+          <div class="compare-bar"><span class="compare-label">SUS Score</span><div class="bar-track"><div class="bar-fill bar-a" style="width:86%;">86.0</div></div></div>
+          <div class="compare-bar"><span class="compare-label"></span><div class="bar-track"><div class="bar-fill bar-b" style="width:39.8%;">39.8</div></div></div>
+          <div class="compare-bar" style="margin-top:8px;"><span class="compare-label">Success Rate</span><div class="bar-track"><div class="bar-fill bar-a" style="width:100%;">100%</div></div></div>
+          <div class="compare-bar"><span class="compare-label"></span><div class="bar-track"><div class="bar-fill bar-b" style="width:30%;">30%</div></div></div>
+          <div class="compare-bar" style="margin-top:8px;"><span class="compare-label">SEQ Score</span><div class="bar-track"><div class="bar-fill bar-a" style="width:85.7%;">6.0 / 7</div></div></div>
+          <div class="compare-bar"><span class="compare-label"></span><div class="bar-track"><div class="bar-fill bar-b" style="width:39.7%;">2.78 / 7</div></div></div>
+        </div>
+        <div>
+          <h3 style="margin-bottom:12px;">Study Design (6 methods)</h3>
+          <ul>
+            <li><strong>10 participants</strong> — China, India, Morocco, Sudan, UK</li>
+            <li><strong>System Usability Scale</strong> + Single Ease Question</li>
+            <li><strong>Accuracy testing</strong> against ground-truth sources</li>
+            <li><strong>Multilingual performance</strong> — 4 languages tested</li>
+            <li><strong>Semi-structured interviews</strong> with thematic analysis</li>
+            <li><strong>Within-subjects baseline</strong> comparison vs. HWU website</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- SLIDE 9 — QUALITATIVE + MULTILINGUAL -->
+  <!-- ============================================================ -->
+  <div class="slide" data-slide="8">
+    <div class="content">
+      <p class="section-num">04 &nbsp;·&nbsp; Results</p>
+      <h2>Qualitative Findings & Multilingual Performance</h2>
+      <div class="two-col">
+        <div>
+          <h3 style="margin-bottom:16px;">5 Themes from Interviews</h3>
+          <div class="card" style="margin-bottom:10px; padding:16px 20px;">
+            <p><strong style="color:var(--accent);">Ease of Use</strong> - "It felt like asking a friend who already knows the university."</p>
+          </div>
+          <div class="card" style="margin-bottom:10px; padding:16px 20px;">
+            <p><strong style="color:var(--accent2);">Trust & Credibility</strong> - "The fact that it shows where the information comes from makes me trust it more than just ChatGPT."</p>
+          </div>
+          <div class="card" style="margin-bottom:10px; padding:16px 20px;">
+            <p><strong style="color:var(--accent3);">Multilingual Value</strong> - "Being able to ask in Chinese and get a proper answer was really helpful."</p>
+          </div>
+          <div class="card" style="margin-bottom:10px; padding:16px 20px;">
+            <p><strong>Navigation Utility</strong> - "The map would have saved me so much time during Welcome Week."</p>
+          </div>
+          <div class="card" style="padding:16px 20px;">
+            <p><strong style="color:var(--text-muted);">Improvement Ideas</strong> - Real-time timetables, voice input, mobile app, RTL text improvements</p>
+          </div>
+        </div>
+        <div>
+          <h3 style="margin-bottom:16px;">Multilingual Performance</h3>
+          <table>
+            <tr><th>Language</th><th>Detection</th><th>Retrieval</th><th>Quality</th></tr>
+            <tr><td>English</td><td>N/A</td><td>100%</td><td>N/A</td></tr>
+            <tr><td>Chinese</td><td>✓ Correct</td><td>100%</td><td>4.2 / 5</td></tr>
+            <tr><td>Hindi</td><td>✓ Correct</td><td>100%</td><td>3.8 / 5</td></tr>
+            <tr><td>Arabic</td><td>✓ Correct</td><td>100%</td><td>3.8 / 5</td></tr>
+          </table>
+          <div class="card" style="margin-top:20px;">
+            <h3 style="color:var(--accent);">Where AI Adds Most Value</h3>
+            <p>Largest usability gaps were for <strong>multilingual tasks</strong> (baseline success 0.70 vs. UniBot 2.00) and <strong>accommodation queries</strong> (baseline 0.90 vs. 2.00) - precisely where information is linguistically inaccessible or fragmented across sites.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- SLIDE 10 — REFLECTION & FUTURE WORK -->
+  <!-- ============================================================ -->
+  <div class="slide" data-slide="9">
+    <div class="content">
+      <p class="section-num">05 &nbsp;·&nbsp; Reflection</p>
+      <h2>Limitations, Lessons & Future Work</h2>
+      <div class="two-col">
+        <div>
+          <h3 style="margin-bottom:14px;">Limitations</h3>
+          <ul>
+            <li><strong>Response time</strong> - 26.8s avg vs. 5s target (sequential API calls for translate + generate)</li>
+            <li><strong>Small sample</strong> - 10 participants; first-impression scores may inflate SUS</li>
+            <li><strong>Evaluator bias</strong> - developer conducted all interviews; independent evaluator needed</li>
+            <li><strong>Static knowledge base</strong> - no real-time timetable or event data</li>
+            <li><strong>Scope</strong> - Edinburgh campus only; 4 languages from a 150-country population</li>
+          </ul>
+          <h3 style="margin-top:24px; margin-bottom:14px;">Key Lessons</h3>
+          <ul>
+            <li>Iterative development caught integration issues early (FAISS → ChromaDB pivot)</li>
+            <li>Predictability of onboarding queries makes tiered routing highly effective</li>
+            <li>Evidence grounding + citations = the critical trust differentiator vs. generic LLMs</li>
+          </ul>
+        </div>
+        <div>
+          <h3 style="margin-bottom:14px;">Future Work</h3>
+          <div class="card" style="margin-bottom:10px;">
+            <p><strong style="color:var(--accent);">Multi-campus deployment</strong> - Architecture already supports campus filtering; extend KB to Dubai, Malaysia, Orkney</p>
+          </div>
+          <div class="card" style="margin-bottom:10px;">
+            <p><strong style="color:var(--accent2);">Live data integration</strong> - Connect to HWU timetable API and events calendar for real-time responses</p>
+          </div>
+          <div class="card" style="margin-bottom:10px;">
+            <p><strong style="color:var(--accent3);">Personalisation via SSO</strong> - Programme-specific and year-specific responses without manual context</p>
+          </div>
+          <div class="card" style="margin-bottom:10px;">
+            <p><strong>Voice & mobile</strong> - Speech-to-text for hands-free campus navigation; native mobile app</p>
+          </div>
+          <div class="card">
+            <p><strong>Continuous learning</strong> - Track follow-up clicks and CLARIFY triggers to refine routing keywords automatically</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- SLIDE 11 — CLOSING -->
+  <!-- ============================================================ -->
+  <div class="slide slide-title" data-slide="10">
+    <div class="content">
+      <p class="section-num">Summary</p>
+      <h1 style="font-size:2.6rem;">UniBot demonstrates that agentic RAG<br>can meaningfully support student onboarding</h1>
+      <div style="display:flex; gap:24px; justify-content:center; margin:32px 0;">
+        <div class="stat-card" style="min-width:160px;">
+          <div class="number">86.0</div>
+          <div class="label">SUS Score</div>
+        </div>
+        <div class="stat-card" style="min-width:160px;">
+          <div class="number">0%</div>
+          <div class="label">Hallucinations</div>
+        </div>
+        <div class="stat-card" style="min-width:160px;">
+          <div class="number">2.8×</div>
+          <div class="label">Faster</div>
+        </div>
+        <div class="stat-card" style="min-width:160px;">
+          <div class="number">4</div>
+          <div class="label">Languages</div>
+        </div>
+      </div>
+      <p style="font-size:1.1rem; max-width:700px; margin:0 auto;">
+        Modular, open-source, and designed for replication — any university can deploy it by replacing the knowledge base and campus geodata.
+      </p>
+      <p style="margin-top:28px; color:var(--text-muted);">
+        <strong>Noman Maqsudi</strong> &nbsp;·&nbsp; H00406480<br>
+        Thank you - Questions?
+      </p>
+    </div>
+  </div>
+
+</div>
+
+<!-- Progress bar & counter -->
+<div class="progress" id="progress"></div>
+<div class="counter" id="counter">1 / 11</div>
+<div class="nav-hint">← → or click to navigate</div>
+
+<script>
+  const slides = document.querySelectorAll('.slide');
+  const total = slides.length;
+  let current = 0;
+
+  function goTo(i) {
+    if (i < 0 || i >= total) return;
+    slides[current].classList.remove('active');
+    current = i;
+    slides[current].classList.add('active');
+    document.getElementById('progress').style.width = ((current + 1) / total * 100) + '%';
+    document.getElementById('counter').textContent = (current + 1) + ' / ' + total;
+  }
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'PageDown') { e.preventDefault(); goTo(current + 1); }
+    if (e.key === 'ArrowLeft' || e.key === 'PageUp') { e.preventDefault(); goTo(current - 1); }
+    if (e.key === 'Home') { e.preventDefault(); goTo(0); }
+    if (e.key === 'End') { e.preventDefault(); goTo(total - 1); }
+  });
+
+  // Click left/right halves to navigate
+  document.addEventListener('click', e => {
+    if (e.target.closest('a, button, img')) return;
+    if (e.clientX > window.innerWidth / 2) goTo(current + 1);
+    else goTo(current - 1);
+  });
+
+  // Touch swipe
+  let touchStartX = 0;
+  document.addEventListener('touchstart', e => { touchStartX = e.changedTouches[0].screenX; });
+  document.addEventListener('touchend', e => {
+    const diff = e.changedTouches[0].screenX - touchStartX;
+    if (Math.abs(diff) > 50) diff > 0 ? goTo(current - 1) : goTo(current + 1);
+  });
+
+  goTo(0);
+</script>
+</body>
+</html>
