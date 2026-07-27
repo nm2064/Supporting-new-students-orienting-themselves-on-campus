@@ -24,8 +24,6 @@ UniBot/
 
 ## Quick Start
 
-### 1. Start Backend
-
 ```bash
 cd UniBot
 
@@ -34,20 +32,16 @@ python -m venv .venv
 pip install -r agentic_rag\requirements.txt
 
 copy agentic_rag\.env.example agentic_rag\.env
-# Edit agentic_rag\.env with your keys
+# Edit agentic_rag\.env with your API keys
 
-python -m agentic_rag
+python start.py
 ```
 
-### 2. Open Frontend
+Then open **http://localhost:8000** in your browser.
 
-Open `index.html` directly, or serve the project root:
+Both the API and the frontend are served from the same process — no second terminal needed.
 
-```bash
-python -m http.server 3000
-```
-
-Then visit `http://localhost:3000`.
+> **API docs** are available at http://localhost:8000/docs
 
 ## Configuration
 
