@@ -1,4 +1,4 @@
-# UniBot — Helping New Students Find Their Way Around Campus
+# UniBot - Supporting New Students on Campus
 
 UniBot is a chatbot that helps new students settle into life at Heriot-Watt University. Students can ask questions about university services, find places on campus and get walking directions. They can also use the chatbot in different languages, which is particularly useful for international students.
 
