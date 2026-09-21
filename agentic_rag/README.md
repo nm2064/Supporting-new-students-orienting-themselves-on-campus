@@ -1,95 +1,31 @@
-# Agentic RAG Backend
+# UniBot backend
 
-FastAPI backend for the UniBot project, with RAG chat, session handling, and campus maps endpoints.
+FastAPI backend for retrieval-augmented chat, multilingual responses, conversation sessions and campus navigation. See the [project setup guide](../README.md#quick-start) for installation and configuration.
 
-## Architecture
+## Run and test
 
-```text
-Frontend (index.html)
-        |
-        | POST /rag-chat
-        v
-FastAPI app factory (app.py)
-  |- API routes (api.py)
-  |- Maps routes (maps/)
-  |- RAG service runtime (rag.py)
-  |- Typed settings (settings.py)
-  `- Structured logging (logging_utils.py)
-```
+From the repository root with the environment activated:
 
-## Project Structure
-
-```text
-agentic_rag/
-├── app.py               # FastAPI app factory
-├── api.py               # Core HTTP routes
-├── main.py              # Direct-run compatibility entrypoint
-├── rag.py               # RAG service runtime
-├── settings.py          # Environment parsing and validation
-├── schemas.py           # API models
-├── config.py            # Backward-compatible config exports
-├── maps/                # Places search and routing
-├── tests/               # Regression tests
-├── requirements.txt     # Python dependencies
-├── knowledge.txt        # Knowledge base
-├── chroma_store/        # Chroma persistence
-└── .env                 # Create from .env.example
-```
-
-## Setup
-
-```bash
-cd UniBot
-python -m venv .venv
-.venv\Scripts\activate
-pip install -r agentic_rag\requirements.txt
-copy agentic_rag\.env.example agentic_rag\.env
-```
-
-Required in `agentic_rag/.env`:
-
-```env
-AZURE_OPENAI_API_KEY=your-azure-key
-USE_AZURE_OPENAI=true
-AZURE_OPENAI_ENDPOINT=https://openaidis.cognitiveservices.azure.com/
-AZURE_OPENAI_API_VERSION=2024-12-01-preview
-AZURE_OPENAI_CHAT_DEPLOYMENT=gpt-5-nano-2
-AZURE_OPENAI_EMBEDDING_DEPLOYMENT=text-embedding-3-small
-CHAT_MODEL=gpt-5-nano
-TRANSLATION_MODEL=gpt-5-nano
-```
-
-Notes:
-- `AZURE_OPENAI_CHAT_DEPLOYMENT` should be your GPT-5 nano deployment name.
-- `AZURE_OPENAI_EMBEDDING_DEPLOYMENT` must be a separate embedding deployment; do not point embeddings at GPT-5 nano.
-
-## Run
-
-Preferred:
-
-```bash
+```console
 python -m agentic_rag
-```
-
-Alternative:
-
-```bash
-uvicorn agentic_rag.app:app --reload --host 0.0.0.0 --port 8000
-```
-
-## API Endpoints
-
-- `GET /health`
-- `POST /ingest`
-- `POST /rag-chat`
-- `GET /session/{id}`
-- `DELETE /session/{id}`
-- `GET /api/places`
-- `GET /api/places/{id}`
-- `POST /api/route`
-
-## Testing
-
-```bash
 python -m pytest agentic_rag/tests -q -p no:cacheprovider
 ```
+
+Alternatively, `python start.py` manages local setup and launches the application. The frontend is available at `/`, and the interactive API reference at `/docs`.
+
+## Components
+
+- `app.py`: application factory, lifecycle and frontend serving.
+- `api.py`, `schemas.py`: ingestion, chat, health and session contracts.
+- `rag.py`: document processing, retrieval and generation.
+- `settings.py`, `config.py`: environment configuration and compatibility exports.
+- `maps/`: campus places, routing provider, caching and rate limits.
+- `tests/`: regression tests with substitute external services.
+
+## Local data and credentials
+
+Copy `.env.example` to `.env` and supply your own credentials. Paths in that configuration are relative to this package unless absolute. The example uses `knowledge_extracted_pages.json`; the minimal fallback in settings is `knowledge.txt`. Keep `data/campus_places.json` available for navigation.
+
+`knowledge_curated_links.txt` and the extracted-page files are preserved research artifacts. Use `POST /ingest` after selecting the knowledge file. The generated `chroma_store/` directory is excluded from Git.
+
+See [architecture](../docs/architecture.md), [frontend integration](../docs/frontend-integration.md) and [data provenance](../data/README.md) for the wider project context.

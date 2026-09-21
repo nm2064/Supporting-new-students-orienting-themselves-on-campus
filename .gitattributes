@@ -1,0 +1,4 @@
+# Preserve source snapshot line endings; avoid rewriting research datasets.
+* -text
+*.png binary
+*.pdf binary

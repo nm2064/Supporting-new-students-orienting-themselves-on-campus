@@ -2,8 +2,8 @@
 """Fetch shortlisted Heriot-Watt links and extract main page text.
 
 Usage:
-  python extract_hw_student_page_text.py
-  python extract_hw_student_page_text.py --input hw_student_links_clean.json
+  python scripts/extract_hw_student_page_text.py
+  python scripts/extract_hw_student_page_text.py --input data/processed/hw_student_links_clean.json
 """
 
 from __future__ import annotations
@@ -23,11 +23,11 @@ from bs4 import BeautifulSoup, Tag
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
-ROOT = Path(__file__).resolve().parent
-DEFAULT_INPUT = ROOT / "hw_student_links_clean.json"
-DEFAULT_OUTPUT_JSON = ROOT / "hw_student_pages_extracted.json"
+ROOT = Path(__file__).resolve().parents[1]
+DEFAULT_INPUT = ROOT / "data" / "processed" / "hw_student_links_clean.json"
+DEFAULT_OUTPUT_JSON = ROOT / "data" / "processed" / "hw_student_pages_extracted.json"
 DEFAULT_OUTPUT_TEXT = ROOT / "agentic_rag" / "knowledge_extracted_pages.txt"
-DEFAULT_LOG = ROOT / "hw_text_extraction.log"
+DEFAULT_LOG = ROOT / "logs" / "hw_text_extraction.log"
 DEFAULT_USER_AGENT = (
     "UniBotPageExtractor/1.0 (+https://example.invalid/contact; purpose=academic-research)"
 )
@@ -291,6 +291,8 @@ def main(argv: Sequence[str]) -> int:
     timeout = max(1.0, float(args.timeout))
     delay = max(0.0, float(args.delay))
 
+    for path in (output_json, output_text, log_file):
+        path.parent.mkdir(parents=True, exist_ok=True)
     configure_logging(log_file)
     links = load_links(input_path)
     session = make_session(args.user_agent)

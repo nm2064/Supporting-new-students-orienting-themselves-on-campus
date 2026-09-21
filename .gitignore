@@ -71,3 +71,10 @@ agentic_rag/chroma_store/
 .DS_Store
 Thumbs.db
 Desktop.ini
+
+# Local tooling and new evaluation runs
+backend_env/
+.ipynb_checkpoints/
+evaluation/results/latest.json
+*.pem
+*.key

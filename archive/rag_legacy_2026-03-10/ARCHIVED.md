@@ -1,16 +1,5 @@
-# Archive Notice
+# Archived legacy prototype
 
-Archive date: 2026-03-10
+This folder contains the earlier retrieval experiments, archived on 10 March 2026 according to the saved archive notice. It is retained for research reference and is not part of the active backend.
 
-Folder status: archived in place
-
-Active backend:
-- `agentic_rag/`
-
-Reason:
-- The old `rag/` prototype is no longer the maintained backend.
-- Filesystem restrictions in this workspace prevented moving or renaming the folder safely.
-
-Guidance:
-- Do not build new backend features here.
-- Treat this folder as reference material only.
+The maintained implementation is `agentic_rag/` at the repository root. Historical dependencies and example documents are preserved here separately. Configure any required credentials through environment variables; no credentials are included.

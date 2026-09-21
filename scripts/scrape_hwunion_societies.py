@@ -2,9 +2,9 @@
 """Scrape text-first society data from HW Union for RAG ingestion.
 
 Usage:
-  python scrape_hwunion_societies.py
-  python scrape_hwunion_societies.py --start-url https://www.hwunion.com/get-involved/societies/
-  python scrape_hwunion_societies.py --max-pages 300 --delay 1.0
+  python scripts/scrape_hwunion_societies.py
+  python scripts/scrape_hwunion_societies.py --start-url https://www.hwunion.com/get-involved/societies/
+  python scripts/scrape_hwunion_societies.py --max-pages 300 --delay 1.0
 """
 
 from __future__ import annotations
@@ -17,6 +17,7 @@ import sys
 import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
 from urllib import robotparser
 from urllib.parse import parse_qsl, urlencode, urljoin, urlparse, urlunparse
@@ -31,9 +32,10 @@ DEFAULT_UA = (
     "UniBotSocietyScraper/1.0 (+https://example.invalid/contact; "
     "purpose=academic-rag-dataset)"
 )
-LOG_FILE = "scraper.log"
-JSONL_FILE = "societies.jsonl"
-TEXT_FILE = "societies.txt"
+ROOT = Path(__file__).resolve().parents[1]
+LOG_FILE = ROOT / "logs" / "scraper.log"
+JSONL_FILE = ROOT / "data" / "raw" / "societies.jsonl"
+TEXT_FILE = ROOT / "data" / "raw" / "societies.txt"
 SOCIAL_HOST_HINTS = (
     "instagram.com",
     "facebook.com",
@@ -574,6 +576,8 @@ def parse_args(argv: List[str]) -> argparse.Namespace:
 
 def main(argv: List[str]) -> int:
     args = parse_args(argv)
+    for path in (LOG_FILE, JSONL_FILE, TEXT_FILE):
+        path.parent.mkdir(parents=True, exist_ok=True)
     configure_logging()
     scraped_at = datetime.now(timezone.utc).isoformat()
     start_url = normalize_url(args.start_url)

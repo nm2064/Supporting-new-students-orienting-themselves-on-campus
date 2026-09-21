@@ -4,6 +4,9 @@ Sends 10 queries across 5 categories, measures response time, accuracy,
 and captures results for the dissertation evaluation section.
 """
 
+import argparse
+from pathlib import Path
+
 import json
 import sys
 import time
@@ -12,7 +15,8 @@ import io
 import requests
 
 # Fix Windows console encoding
-sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+if sys.platform == 'win32' and hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
 
 BASE_URL = "http://127.0.0.1:8000"
 
@@ -148,6 +152,12 @@ def run_query(test_case):
 
 
 def main():
+    global BASE_URL
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--base-url", default=BASE_URL)
+    parser.add_argument("--output", type=Path, default=Path(__file__).resolve().parent / "results" / "latest.json")
+    args = parser.parse_args()
+    BASE_URL = args.base_url.rstrip("/")
     print("=" * 70)
     print("UniBot Evaluation Test Runner")
     print("=" * 70)
@@ -259,10 +269,11 @@ def main():
         "individual_results": results,
     }
 
-    with open("evaluation_results.json", "w", encoding="utf-8") as f:
+    args.output.parent.mkdir(parents=True, exist_ok=True)
+    with args.output.open("w", encoding="utf-8") as f:
         json.dump(output, f, indent=2, ensure_ascii=False)
 
-    print(f"\nFull results saved to evaluation_results.json")
+    print(f"\nFull results saved to {args.output}")
 
 
 if __name__ == "__main__":

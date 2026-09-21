@@ -1,16 +1,5 @@
-# Archived Legacy Prototype
+# Archived legacy prototype
 
-This `rag/` folder is archived in place as of 2026-03-10.
+This folder contains the earlier retrieval experiments, archived on 10 March 2026 according to the saved archive notice. It is retained for research reference and is not part of the active backend.
 
-It is not the active UniBot backend anymore.
-
-Use `agentic_rag/` for all current backend work, runtime changes, tests, and deployment.
-
-Why this still exists:
-- The workspace filesystem currently blocks creating or renaming top-level directories here.
-- To avoid data loss, the prototype was preserved in place and explicitly marked as inactive.
-
-Status:
-- Legacy experimental LangChain/Gemini prototype
-- Not part of the maintained backend path
-- Kept for reference only
+The maintained implementation is `agentic_rag/` at the repository root. Historical dependencies and example documents are preserved here separately. Configure any required credentials through environment variables; no credentials are included.

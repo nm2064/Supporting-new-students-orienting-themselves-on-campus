@@ -8,10 +8,10 @@ Default presets cover:
 - Heriot-Watt Sports Union: sportsunion.site.hw.ac.uk
 
 Usage:
-  python crawl_hw_website.py
-  python crawl_hw_website.py --sites all --max-pages-per-site 150
-  python crawl_hw_website.py --sites hwu watt-living union sports-union
-  python crawl_hw_website.py --sites hwu --output-prefix hwu_links
+  python scripts/crawl_hw_website.py
+  python scripts/crawl_hw_website.py --sites all --max-pages-per-site 150
+  python scripts/crawl_hw_website.py --sites hwu watt-living union sports-union
+  python scripts/crawl_hw_website.py --sites hwu --output-prefix hwu_links
 """
 
 from __future__ import annotations
@@ -34,9 +34,10 @@ from bs4 import BeautifulSoup, Tag
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
-DEFAULT_JSONL = Path("hw_useful_links.jsonl")
-DEFAULT_TEXT = Path("hw_useful_links.txt")
-DEFAULT_LOG = Path("hw_website_crawler.log")
+ROOT = Path(__file__).resolve().parents[1]
+DEFAULT_JSONL = ROOT / "data" / "raw" / "hw_useful_links.jsonl"
+DEFAULT_TEXT = ROOT / "data" / "raw" / "hw_useful_links.txt"
+DEFAULT_LOG = ROOT / "logs" / "hw_website_crawler.log"
 DEFAULT_USER_AGENT = (
     "UniBotWebsiteCrawler/1.0 (+https://example.invalid/contact; purpose=academic-research)"
 )
@@ -702,6 +703,8 @@ def parse_args(argv: Sequence[str]) -> CrawlConfig:
 
 def main(argv: Sequence[str]) -> int:
     config = parse_args(argv)
+    for path in (config.output_jsonl, config.output_text, config.log_file):
+        path.parent.mkdir(parents=True, exist_ok=True)
     configure_logging(config.log_file)
     logging.info(
         "Starting crawl for sites=%s max_pages_per_site=%s",
