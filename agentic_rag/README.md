@@ -1,6 +1,6 @@
 # UniBot backend
 
-FastAPI backend for retrieval-augmented chat, multilingual responses, conversation sessions and campus navigation. See the [project setup guide](../README.md#quick-start) for installation and configuration.
+FastAPI backend for retrieval-augmented chat, multilingual responses, conversation sessions and campus navigation. See the [project setup guide](../README.md#how-to-run-unibot-on-your-computer) for installation and configuration.
 
 ## Run and test
 
