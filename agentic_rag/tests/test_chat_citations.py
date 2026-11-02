@@ -238,3 +238,35 @@ def test_everyday_questions_that_share_words_with_sensitive_topics_are_not_signp
         response = rag.chat(question, session_id=f"n{i}")
         assert response.needs_human_handoff is False, question
         assert "advice" not in response.answer_markdown.lower(), question
+
+
+# ---- privacy: server-side conversation history is short-lived ---------------------------
+
+
+def test_an_idle_conversation_is_forgotten_after_thirty_minutes(knowledge_settings):
+    from agentic_rag.rag import SessionStore
+
+    clock = {"now": 1_000.0}
+    store = SessionStore(idle_ttl_s=30 * 60, clock=lambda: clock["now"])
+    rag = build_rag(knowledge_settings, FakeKnowledgeLLM("Open 24 hours {cite:open 24 hours}."), session_store=store)
+
+    rag.chat("What are the library opening hours?", session_id="p1")
+    clock["now"] += 29 * 60
+    assert rag.get_session_history("p1") != []
+    clock["now"] += 31 * 60
+    assert rag.get_session_history("p1") == []
+
+
+def test_the_server_keeps_a_bounded_number_of_conversations_dropping_the_least_recent(knowledge_settings):
+    from agentic_rag.rag import SessionStore
+
+    clock = {"now": 0.0}
+    store = SessionStore(max_sessions=2, clock=lambda: clock["now"])
+    rag = build_rag(knowledge_settings, FakeKnowledgeLLM("Open 24 hours {cite:open 24 hours}."), session_store=store)
+
+    for session in ("a", "b", "c"):
+        clock["now"] += 1
+        rag.chat("What are the library opening hours?", session_id=session)
+
+    assert rag.get_session_history("a") == []
+    assert rag.get_session_history("b") != [] and rag.get_session_history("c") != []

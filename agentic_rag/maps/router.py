@@ -32,7 +32,6 @@ _rate_limiter = FixedWindowRateLimiter()
 
 def _log_route(
     *,
-    ip: str,
     profile: str,
     locale: str,
     provider: str,
@@ -44,7 +43,6 @@ def _log_route(
         logger,
         "route_request",
         ts=datetime.now(timezone.utc).isoformat(),
-        ip=ip,
         profile=profile,
         locale=locale,
         provider=provider,
@@ -134,7 +132,7 @@ async def get_route(
     service: MapsService = Depends(get_maps_service),
 ):
     settings = get_settings()
-    ip = _enforce_rate_limit(
+    _enforce_rate_limit(
         request,
         key="route",
         limit=settings.map_rate_limit_route_per_min,
@@ -144,7 +142,6 @@ async def get_route(
     try:
         response, cache_hit = await service.get_route(route_request)
         _log_route(
-            ip=ip,
             profile=route_request.profile.value,
             locale=route_request.locale.value,
             provider=response.provider,
@@ -155,7 +152,6 @@ async def get_route(
         return response
     except RoutingUnavailable as error:
         _log_route(
-            ip=ip,
             profile=route_request.profile.value,
             locale=route_request.locale.value,
             provider=error.provider,

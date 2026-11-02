@@ -7,7 +7,9 @@ import json
 import logging
 import re
 import threading
+import time
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -456,42 +458,76 @@ class VectorStore:
 class SessionState:
     history: list[dict[str, str]] = field(default_factory=list)
     language_lock: str | None = None
+    last_used: float = 0.0
 
 
 class SessionStore:
-    """Thread-safe in-memory session storage."""
+    """Thread-safe, short-lived in-memory conversation storage.
 
-    def __init__(self, max_messages: int = 20):
+    Conversations are kept only while in use: one idle for ``idle_ttl_s`` is
+    forgotten, and at most ``max_sessions`` are held (least recently used are
+    dropped first). Nothing is written to disk.
+    """
+
+    def __init__(
+        self,
+        max_messages: int = 20,
+        idle_ttl_s: float = 30 * 60,
+        max_sessions: int = 2000,
+        clock: Callable[[], float] = time.monotonic,
+    ):
         self.max_messages = max_messages
+        self.idle_ttl_s = idle_ttl_s
+        self.max_sessions = max_sessions
+        self._clock = clock
         self._sessions: dict[str, SessionState] = {}
         self._lock = threading.Lock()
 
+    # Callers hold self._lock.
+    def _live(self, session_id: str) -> SessionState | None:
+        state = self._sessions.get(session_id)
+        if state is not None and self._clock() - state.last_used > self.idle_ttl_s:
+            del self._sessions[session_id]
+            return None
+        return state
+
+    def _touch(self, session_id: str) -> SessionState:
+        state = self._live(session_id)
+        if state is None:
+            state = self._sessions[session_id] = SessionState()
+        state.last_used = self._clock()
+        if len(self._sessions) > self.max_sessions:
+            now = self._clock()
+            for stale in [sid for sid, s in self._sessions.items() if now - s.last_used > self.idle_ttl_s]:
+                del self._sessions[stale]
+            while len(self._sessions) > self.max_sessions:
+                oldest = min(self._sessions, key=lambda sid: self._sessions[sid].last_used)
+                del self._sessions[oldest]
+        return state
+
     def history_for(self, session_id: str) -> list[dict[str, str]]:
         with self._lock:
-            state = self._sessions.get(session_id)
-            if state is None:
-                return []
-            return [dict(message) for message in state.history]
+            state = self._live(session_id)
+            return [dict(message) for message in state.history] if state else []
 
     def get_language_lock(self, session_id: str) -> str | None:
         with self._lock:
-            state = self._sessions.get(session_id)
+            state = self._live(session_id)
             return state.language_lock if state else None
 
     def set_language_lock(self, session_id: str, language: str) -> None:
         with self._lock:
-            state = self._sessions.setdefault(session_id, SessionState())
-            state.language_lock = language
+            self._touch(session_id).language_lock = language
 
     def clear_language_lock(self, session_id: str) -> None:
         with self._lock:
-            state = self._sessions.get(session_id)
+            state = self._live(session_id)
             if state is not None:
                 state.language_lock = None
 
     def append_exchange(self, session_id: str, user_message: str, assistant_message: str) -> None:
         with self._lock:
-            state = self._sessions.setdefault(session_id, SessionState())
+            state = self._touch(session_id)
             state.history.append({"role": "user", "content": user_message})
             state.history.append({"role": "assistant", "content": assistant_message})
             if len(state.history) > self.max_messages:
@@ -586,6 +622,7 @@ class AgenticRAG:
         settings: AppSettings,
         llm: Any | None = None,
         translator: Any | None = None,
+        session_store: SessionStore | None = None,
     ) -> "AgenticRAG":
         """Build the assistant. ``llm`` and ``translator`` default to the real adapters."""
         backend = llm or LLMGateway(settings)
@@ -594,6 +631,7 @@ class AgenticRAG:
             backend=backend,
             vector_store=VectorStore(settings, backend),
             document_processor=DocumentProcessor(settings),
+            session_store=session_store,
             translator=translator,
         )
 
