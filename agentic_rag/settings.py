@@ -96,6 +96,16 @@ class AppSettings:
     map_rate_limit_places_per_min: int
     map_enable_translation_fallback: bool
     maps_data_file: Path
+    # "nvidia", "azure" or "openai". Empty means derive from USE_AZURE_OPENAI.
+    llm_provider: str = ""
+    nvidia_api_key: str = ""
+    nvidia_base_url: str = "https://integrate.api.nvidia.com/v1"
+
+    @property
+    def provider(self) -> str:
+        if self.llm_provider:
+            return self.llm_provider
+        return "azure" if self.use_azure_openai else "openai"
 
     @classmethod
     def from_env(cls) -> "AppSettings":
@@ -152,19 +162,28 @@ class AppSettings:
             map_rate_limit_places_per_min=_read_int("MAP_RATE_LIMIT_PLACES_PER_MIN", 60),
             map_enable_translation_fallback=_read_bool("MAP_ENABLE_TRANSLATION_FALLBACK", True),
             maps_data_file=_resolve_path("MAPS_DATA_FILE", BASE_DIR / "data" / "campus_places.json"),
+            llm_provider=os.getenv("LLM_PROVIDER", "").strip().lower(),
+            nvidia_api_key=os.getenv("NVIDIA_API_KEY", "").strip(),
+            nvidia_base_url=os.getenv("NVIDIA_BASE_URL", "https://integrate.api.nvidia.com/v1").strip(),
         )
 
     @property
     def effective_openai_api_key(self) -> str:
+        """API key for whichever provider is active."""
+        if self.provider == "nvidia":
+            return self.nvidia_api_key
         if self.use_azure_openai and self.azure_openai_api_key:
             return self.azure_openai_api_key
         return self.openai_api_key
 
     def validate_required(self) -> None:
         missing: list[str] = []
-        if not self.effective_openai_api_key:
+        if self.provider == "nvidia":
+            if not self.nvidia_api_key:
+                missing.append("NVIDIA_API_KEY")
+        elif not self.effective_openai_api_key:
             missing.append("AZURE_OPENAI_API_KEY" if self.use_azure_openai else "OPENAI_API_KEY")
-        if self.use_azure_openai and not self.azure_openai_endpoint:
+        if self.provider == "azure" and not self.azure_openai_endpoint:
             missing.append("AZURE_OPENAI_ENDPOINT")
         if missing:
             joined = ", ".join(missing)

@@ -9,8 +9,12 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import threading
+import time
 from typing import Any
+
+import openai
 
 from .logging_utils import log_event
 from .settings import AppSettings
@@ -19,14 +23,24 @@ logger = logging.getLogger("agentic_rag.llm")
 
 _REASONING_MODEL_PREFIXES = ("gpt-5", "gpt-6", "o1", "o3", "o4")
 
+_PERMANENT_ERRORS = (
+    openai.AuthenticationError,
+    openai.PermissionDeniedError,
+    openai.BadRequestError,
+    openai.NotFoundError,
+)
+
 
 class LLMGateway:
     """Lazy OpenAI / Azure OpenAI client with model quirks handled in one place."""
 
-    def __init__(self, settings: AppSettings, client: Any | None = None):
+    EMBEDDING_ATTEMPTS = 6
+
+    def __init__(self, settings: AppSettings, client: Any | None = None, retry_delay_s: float = 1.0):
         self.settings = settings
         self._client: Any | None = client
         self._lock = threading.Lock()
+        self._retry_delay_s = retry_delay_s
 
     # ---- client construction -------------------------------------------------
 
@@ -39,7 +53,19 @@ class LLMGateway:
                 return self._client
 
             self.settings.validate_required()
-            if self.settings.use_azure_openai and self.settings.azure_openai_endpoint:
+            if self._nvidia():
+                from openai import OpenAI
+
+                # Large hosted models can take a while on thorough answers;
+                # Caddy allows 120s, so stay under that.
+                self._client = OpenAI(
+                    api_key=self.settings.nvidia_api_key,
+                    base_url=self.settings.nvidia_base_url,
+                    timeout=90.0,
+                    max_retries=1,
+                )
+                log_event(logger, "openai_client_initialized", provider="nvidia")
+            elif self.settings.use_azure_openai and self.settings.azure_openai_endpoint:
                 if self._azure_v1():
                     from openai import OpenAI
 
@@ -73,27 +99,35 @@ class LLMGateway:
 
         return self._client
 
+    def _nvidia(self) -> bool:
+        return self.settings.provider == "nvidia"
+
     def _azure_v1(self) -> bool:
-        return self.settings.use_azure_openai and self.settings.azure_openai_endpoint.rstrip("/").endswith(
-            "/openai/v1"
+        return (
+            self.settings.provider == "azure"
+            and self.settings.azure_openai_endpoint.rstrip("/").endswith("/openai/v1")
         )
 
     def _use_responses(self, model: str) -> bool:
+        if self._nvidia():
+            return False
         return self._azure_v1() or model.lower().startswith("gpt-6")
 
     # ---- model naming and quirks ---------------------------------------------
 
     def _chat_model_name(self, fallback_model: str | None) -> str:
-        if self.settings.use_azure_openai and self.settings.azure_openai_chat_deployment:
+        azure = self.settings.provider == "azure"
+        if azure and self.settings.azure_openai_chat_deployment:
             return self.settings.azure_openai_chat_deployment
-        if self.settings.use_azure_openai and self.settings.azure_openai_deployment:
+        if azure and self.settings.azure_openai_deployment:
             return self.settings.azure_openai_deployment
         return fallback_model or self.settings.chat_model
 
     def _embedding_model_name(self) -> str:
-        if self.settings.use_azure_openai and self.settings.azure_openai_embedding_deployment:
+        azure = self.settings.provider == "azure"
+        if azure and self.settings.azure_openai_embedding_deployment:
             return self.settings.azure_openai_embedding_deployment
-        if self.settings.use_azure_openai and self.settings.azure_openai_deployment:
+        if azure and self.settings.azure_openai_deployment:
             return self.settings.azure_openai_deployment
         return self.settings.embedding_model
 
@@ -130,12 +164,26 @@ class LLMGateway:
             raise RuntimeError("Model response did not complete with usable text")
         return text
 
-    def embed_texts(self, texts: list[str]) -> list[list[float]]:
-        response = self._get_client().embeddings.create(
-            model=self._embedding_model_name(),
-            input=texts,
-        )
-        return [item.embedding for item in response.data]
+    def embed_texts(self, texts: list[str], input_type: str = "passage") -> list[list[float]]:
+        """Embed ``texts``. ``input_type`` is "passage" for indexed documents and
+        "query" for search questions; asymmetric retrieval models need it."""
+        params: dict[str, Any] = {"model": self._embedding_model_name(), "input": texts}
+        if self._nvidia():
+            params["extra_body"] = {"input_type": input_type, "truncate": "END"}
+        # Hosted embedders fail intermittently with 5xx; retry those with backoff.
+        # Errors that retrying cannot fix (bad key, bad request) are raised at once.
+        for attempt in range(1, self.EMBEDDING_ATTEMPTS + 1):
+            try:
+                response = self._get_client().embeddings.create(**params)
+                return [item.embedding for item in response.data]
+            except _PERMANENT_ERRORS:
+                raise
+            except Exception as error:
+                if attempt == self.EMBEDDING_ATTEMPTS:
+                    raise
+                logger.warning("Embedding attempt %d failed (%s); retrying.", attempt, type(error).__name__)
+                time.sleep(self._retry_delay_s * attempt)
+        raise AssertionError("unreachable")
 
     def chat_json(
         self,
@@ -164,17 +212,38 @@ class LLMGateway:
                 {"role": "user", "content": user_prompt},
             ],
         }
-        if self._is_reasoning_model(chat_model):
+        if self._is_reasoning_model(chat_model) and not self._nvidia():
             params["max_completion_tokens"] = budget
         else:
             params["max_tokens"] = budget
             params["temperature"] = 0.1
 
         response = self._get_client().chat.completions.create(**params)
-        content = (response.choices[0].message.content or "{}").strip()
-        try:
-            parsed = json.loads(content)
-        except json.JSONDecodeError:
-            logger.warning("Model returned invalid JSON. Falling back to empty object.")
+        choice = response.choices[0]
+        parsed = _parse_json_object(choice.message.content or "")
+        if parsed is None:
+            logger.warning(
+                "Model returned no usable JSON (finish_reason=%s).", getattr(choice, "finish_reason", None)
+            )
             return {}
-        return parsed if isinstance(parsed, dict) else {}
+        return parsed
+
+
+_THINKING = re.compile(r"(?s)<think>.*?</think>")
+
+
+def _parse_json_object(text: str) -> dict[str, Any] | None:
+    """Parse a JSON object from a model reply, tolerating reasoning text and code fences."""
+    text = _THINKING.sub("", text).strip()
+    candidates = [text]
+    start, end = text.find("{"), text.rfind("}")
+    if 0 <= start < end:
+        candidates.append(text[start : end + 1])
+    for candidate in candidates:
+        try:
+            parsed = json.loads(candidate)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(parsed, dict):
+            return parsed
+    return None

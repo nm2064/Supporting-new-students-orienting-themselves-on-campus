@@ -413,7 +413,7 @@ class VectorStore:
         count = self.collection.count()
         if count == 0:
             return []
-        query_embedding = self.backend.embed_texts([query])[0]
+        query_embedding = self.backend.embed_texts([query], input_type="query")[0]
         results = self.collection.query(
             query_embeddings=[query_embedding],
             n_results=min(count, top_k * 3),
@@ -883,6 +883,7 @@ class AgenticRAG:
 
     # "[3]" or a grouped "[1, 4]", with any whitespace in front of it.
     _MARKER = re.compile(r"(\s*)\[(\d+(?:\s*,\s*\d+)*)\]")
+    _MARKER_RUN = re.compile(r"(?:\[\d+\])+")
 
     def _cite_pages(
         self,
@@ -936,6 +937,11 @@ class AgenticRAG:
             return number_for_page[chunk.source]
 
         rewritten = self._MARKER.sub(rewrite, answer_markdown)
+        # "[1][1]" (two passages of one page cited together) reads as one citation.
+        rewritten = self._MARKER_RUN.sub(
+            lambda run: "".join(f"[{n}]" for n in dict.fromkeys(re.findall(r"\d+", run.group(0)))),
+            rewritten,
+        )
         if not citations:
             # The answer drew on the knowledge base but cited nothing inline:
             # still show the best-matching pages it was given, so the student

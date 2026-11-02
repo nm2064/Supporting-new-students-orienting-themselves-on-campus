@@ -170,3 +170,25 @@ def test_translation_outage_still_gives_a_cited_answer_in_the_students_language(
     assert response.effective_language == "ar"
     assert response.answer_markdown == "المكتبة مفتوحة على مدار الساعة [1]."
     assert response.citations[0]["url"] == OPENING_HOURS_URL
+
+
+def test_pages_are_indexed_as_passages_and_the_question_is_searched_as_a_query(knowledge_settings):
+    llm = FakeKnowledgeLLM("The library is open 24 hours a day {cite:open 24 hours}.")
+    rag = build_rag(knowledge_settings, llm)
+
+    rag.chat("What are the library opening hours?", session_id="s8")
+
+    page_types = {kind for kind, text in llm.embedded if "Library opening hours" in text}
+    question_types = {kind for kind, text in llm.embedded if text == "What are the library opening hours?"}
+    assert page_types == {"passage"}
+    assert question_types == {"query"}
+
+
+def test_adjacent_markers_for_the_same_page_collapse_into_one(knowledge_settings):
+    small_chunks = replace(knowledge_settings, chunk_size=200, chunk_overlap=0)
+    llm = FakeKnowledgeLLM("The library is open all day in term and needs an ID card late {cite:open 24 hours}{cite:after 6pm}.")
+    rag = build_rag(small_chunks, llm)
+
+    response = rag.chat("What are the library opening hours?", session_id="s9")
+
+    assert response.answer_markdown == "The library is open all day in term and needs an ID card late [1]."

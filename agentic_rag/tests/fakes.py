@@ -36,6 +36,7 @@ class FakeOpenAIClient:
 def luna_settings(**overrides):
     return replace(
         get_settings(),
+        llm_provider="azure",
         use_azure_openai=True,
         azure_openai_endpoint="https://example.services.ai.azure.com/openai/v1",
         azure_openai_api_key="unit-test-key",
@@ -68,9 +69,12 @@ class FakeKnowledgeLLM:
         # names one of these languages, the reply uses that template instead.
         self.replies_in = replies_in or {}
         self.prompts: list[dict[str, str]] = []
+        self.embedded: list[tuple[str, str]] = []
 
-    def embed_texts(self, texts: list[str]) -> list[list[float]]:
+    def embed_texts(self, texts: list[str], input_type: str = "passage") -> list[list[float]]:
         import math
+
+        self.embedded.extend((input_type, text) for text in texts)
         import re
         import zlib
 
@@ -127,3 +131,16 @@ class FakeTranslator:
         if text in self.phrasebook:
             return self.phrasebook[text]
         return text.replace("[", "【").replace("]", "】")
+
+
+def nvidia_settings(**overrides):
+    values = {
+        "llm_provider": "nvidia",
+        "use_azure_openai": False,
+        "nvidia_api_key": "nvapi-unit-test",
+        "nvidia_base_url": "https://integrate.api.nvidia.com/v1",
+        "chat_model": "nvidia/nemotron-3-ultra-550b-a55b",
+        "embedding_model": "nvidia/nemotron-3.5-embed-1b",
+    }
+    values.update(overrides)
+    return replace(get_settings(), **values)

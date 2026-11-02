@@ -571,9 +571,33 @@
             });
         };
 
+        const tableCells = (line) => line.trim().replace(/^\||\|$/g, "").split("|").map((cell) => cell.trim());
+
         const AnswerBody = ({ text, citations }) => {
             const blocks = [];
             let list = null;
+            let table = null;
+            const flushTable = () => {
+                if (table) {
+                    const [header, ...rows] = table.rows;
+                    const keyBase = `t${blocks.length}`;
+                    blocks.push(
+                        <div key={keyBase} className="overflow-x-auto my-1">
+                            <table className="text-xs border-collapse">
+                                <thead>
+                                    <tr>{header.map((cell, i) => <th key={i} className="border border-gray-300/60 px-2 py-1 text-start font-semibold">{renderInline(cell, citations, `${keyBase}h${i}`)}</th>)}</tr>
+                                </thead>
+                                <tbody>
+                                    {rows.map((row, r) => (
+                                        <tr key={r}>{row.map((cell, i) => <td key={i} className="border border-gray-300/60 px-2 py-1 align-top">{renderInline(cell, citations, `${keyBase}r${r}c${i}`)}</td>)}</tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    );
+                    table = null;
+                }
+            };
             const flushList = () => {
                 if (list) {
                     const items = list.items;
@@ -586,6 +610,14 @@
             String(text || "").split("\n").forEach((rawLine, lineIndex) => {
                 const line = rawLine.trimEnd();
                 const key = `l${lineIndex}`;
+                if (/^\s*\|.*\|\s*$/.test(line)) {
+                    flushList();
+                    if (/^\s*\|[\s:|-]+\|\s*$/.test(line)) return; // header separator row
+                    if (!table) table = { rows: [] };
+                    table.rows.push(tableCells(line));
+                    return;
+                }
+                flushTable();
                 const bullet = line.match(/^\s*[-*•]\s+(.*)$/);
                 const numbered = line.match(/^\s*\d+[.)]\s+(.*)$/);
                 if (bullet || numbered) {
@@ -605,6 +637,7 @@
                 }
             });
             flushList();
+            flushTable();
             return <div className="text-sm leading-relaxed space-y-1 break-words">{blocks}</div>;
         };
 
