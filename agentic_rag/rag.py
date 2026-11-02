@@ -18,6 +18,7 @@ from deep_translator import GoogleTranslator
 from langdetect import DetectorFactory, LangDetectException, detect_langs
 
 from .llm import LLMGateway
+from .signposting import signpost_for
 from .logging_utils import log_event
 from .settings import AppSettings, get_settings
 
@@ -1014,6 +1015,11 @@ class AgenticRAG:
         query_en = self._translate_text(query, effective_language, "en")
 
         decision = self._router_decision(query_en, history, was_translated=effective_language != "en")
+        signpost = signpost_for(query_en, query)
+        if signpost is not None and decision.action != "RETRIEVE":
+            # Never answer a crisis or a personal visa/medical/legal question with
+            # "please clarify" or small talk: look up the relevant support services.
+            decision = RouterDecision(action="RETRIEVE", reasoning=f"Signposted topic: {signpost.topic}.")
         relevant_chunks: list[RetrievedChunk] = []
 
         if decision.action == "CLARIFY":
@@ -1087,6 +1093,12 @@ class AgenticRAG:
             ]
         if clarifying:
             clarifying = self._translate_text(clarifying, "en", effective_language)
+
+        if signpost is not None:
+            note = self._translate_text(signpost.message, "en", effective_language)
+            parts = [note, answer_markdown] if signpost.first else [answer_markdown, note]
+            answer_markdown = "\n\n".join(part for part in parts if part)
+            needs_handoff = True
 
         log_event(
             logger,

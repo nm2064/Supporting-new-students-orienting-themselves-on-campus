@@ -192,3 +192,49 @@ def test_adjacent_markers_for_the_same_page_collapse_into_one(knowledge_settings
     response = rag.chat("What are the library opening hours?", session_id="s9")
 
     assert response.answer_markdown == "The library is open all day in term and needs an ID card late [1]."
+
+
+# ---- signposting to people for personal visa, medical, legal and crisis matters ---------
+
+VISA_PAGE = "https://www.hw.ac.uk/students/international-students/uk-campus-students/visas-and-immigration"
+CRISIS_PAGE = (
+    "https://www.hw.ac.uk/students/health-and-wellbeing/edinburgh-campus/"
+    "student-wellbeing-services/counselling/crisis-support"
+)
+
+
+def test_personal_visa_questions_still_get_the_facts_but_are_pointed_to_the_immigration_team(knowledge_settings):
+    llm = FakeKnowledgeLLM("The library is open 24 hours a day {cite:open 24 hours}.")
+    rag = build_rag(knowledge_settings, llm)
+
+    response = rag.chat("Will my student visa be cancelled if I fail a course at the library?", session_id="v1")
+
+    assert response.answer_markdown.startswith("The library is open 24 hours a day [1].")
+    assert VISA_PAGE in response.answer_markdown
+    assert response.needs_human_handoff is True
+
+
+def test_a_crisis_message_gets_urgent_help_first_even_when_it_is_too_short_to_route(knowledge_settings):
+    rag = build_rag(knowledge_settings, FakeKnowledgeLLM("unused"))
+
+    response = rag.chat("I feel suicidal", session_id="c1")
+
+    assert "999" in response.answer_markdown
+    assert "116 123" in response.answer_markdown
+    assert CRISIS_PAGE in response.answer_markdown
+    assert response.needs_human_handoff is True
+    assert response.clarifying_question is None
+
+
+def test_everyday_questions_that_share_words_with_sensitive_topics_are_not_signposted(knowledge_settings):
+    llm = FakeKnowledgeLLM("The Oriam sports centre offers a gym and fitness classes {cite:sports centre}.")
+    rag = build_rag(knowledge_settings, llm)
+
+    for i, question in enumerate([
+        "Can I book a badminton court at the sports centre?",
+        "Is the library still open during exams?",
+        "Where do campus security or police patrol at night near the sports centre?",
+    ]):
+        response = rag.chat(question, session_id=f"n{i}")
+        assert response.needs_human_handoff is False, question
+        assert "advice" not in response.answer_markdown.lower(), question
