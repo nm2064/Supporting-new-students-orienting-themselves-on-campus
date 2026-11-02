@@ -78,3 +78,22 @@ def test_maps_service_cache_and_translation():
     assert translator.calls == 1
     assert first.steps[0].instruction.startswith("[ar]")
     assert second.steps[0].instruction.startswith("[ar]")
+
+
+def test_route_instructions_are_translated_through_the_llm_gateway_on_luna():
+    from agentic_rag.llm import LLMGateway
+    from agentic_rag.maps.service import OpenAIInstructionTranslator
+    from agentic_rag.tests.fakes import FakeOpenAIClient, luna_settings
+
+    client = FakeOpenAIClient(output_text='{"instructions": ["اذهب مباشرة", "انعطف يسارا"]}')
+    translator = OpenAIInstructionTranslator(gateway=LLMGateway(luna_settings(), client=client))
+    steps = [
+        RouteStep(instruction="Go straight", distance_m=100, duration_s=70),
+        RouteStep(instruction="Turn left", distance_m=20, duration_s=15),
+    ]
+
+    translated = asyncio.run(translator.translate_steps(steps, Locale.ar))
+
+    assert [step.instruction for step in translated] == ["اذهب مباشرة", "انعطف يسارا"]
+    assert [step.distance_m for step in translated] == [100, 20]
+    assert "temperature" not in client.response_requests[0]
