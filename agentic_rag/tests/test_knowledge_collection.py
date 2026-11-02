@@ -5,6 +5,7 @@ from agentic_rag.knowledge_collection import (
     KnowledgeCollector,
     LibraryHoursSource,
     Scope,
+    SocietiesSource,
     StudentEventsSource,
 )
 
@@ -309,3 +310,37 @@ def test_http_links_to_a_page_are_treated_as_the_https_page():
 
     assert [p["url"] for p in corpus["pages"]] == [f"{HWU}/students/enrolment"]
     assert "http://www.hw.ac.uk/students/enrolment" not in web.fetched
+
+
+SOCIETIES_FEED = "https://www.hwunion.com/svc/feeds/groups/6033?subtree=true&attributesets=Status"
+SOCIETIES_PAGE = "https://www.hwunion.com/get-involved/societies"
+
+
+def test_societies_from_the_union_feed_become_cited_pages_and_a_directory_by_category():
+    import json
+
+    feed = [
+        {"Id": 6193, "Name": "Chinese Students and Scholars Association", "Type": "Society", "Category": "Cultural",
+         "EmailAddress": "hwucssa@outlook.com", "InstagramUsername": "", "Url": "https://www.hwunion.com/societies/6193/",
+         "LongDescription": None, "Description": None, "Attributes": [{"Set": "Status", "Values": ["Affiliated"]}]},
+        {"Id": 7001, "Name": "Hillwalking Club", "Type": "Society", "Category": "Activity",
+         "EmailAddress": "hillwalking@hw.ac.uk", "InstagramUsername": "hwhillwalking",
+         "Url": "https://www.hwunion.com/societies/7001/",
+         "LongDescription": "<p>We climb Munros most <strong>Saturdays</strong>. Beginners welcome!</p>"},
+    ]
+    web = FakeWeb({SOCIETIES_FEED: json.dumps(feed)})
+
+    corpus = KnowledgeCollector(fetch=web, scope=SCOPE, delay_s=0).collect(
+        societies=SocietiesSource(api_url=SOCIETIES_FEED, directory_page=SOCIETIES_PAGE)
+    )
+
+    by_title = {p["title"]: p for p in corpus["pages"]}
+    hillwalking = by_title["Hillwalking Club (society)"]
+    assert hillwalking["url"] == "https://www.hwunion.com/societies/7001"
+    assert "We climb Munros most Saturdays. Beginners welcome!" in hillwalking["extracted_text"]
+    assert "Contact: hillwalking@hw.ac.uk" in hillwalking["extracted_text"]
+    assert "Instagram: @hwhillwalking" in hillwalking["extracted_text"]
+    directory = by_title["Students' Union societies directory"]
+    assert directory["url"] == SOCIETIES_PAGE
+    assert "Activity: Hillwalking Club" in directory["extracted_text"]
+    assert "Cultural: Chinese Students and Scholars Association" in directory["extracted_text"]

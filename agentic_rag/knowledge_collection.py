@@ -86,7 +86,9 @@ _SKIP_HEADINGS = {"related content", "share this page", "explore more"}
 
 
 def _clean(text: str) -> str:
-    return re.sub(r"\s+", " ", text.replace("\xa0", " ")).strip()
+    text = re.sub(r"\s+", " ", text.replace("\xa0", " ")).strip()
+    # get_text(" ") puts a space before punctuation that follows inline tags.
+    return re.sub(r" ([.,;:!?)])", r"\1", text)
 
 
 def _content_root(soup: BeautifulSoup) -> Tag | None:
@@ -244,6 +246,7 @@ class KnowledgeCollector:
         seed_urls: Iterable[str] = (),
         library_hours: LibraryHoursSource | None = None,
         student_events: StudentEventsSource | None = None,
+        societies: SocietiesSource | None = None,
     ) -> dict:
         queue: list[tuple[str, int]] = []
         queued: set[str] = set()
@@ -312,6 +315,20 @@ class KnowledgeCollector:
                 pages.extend(_student_event_pages(result.text))
             else:
                 unavailable.append({"url": student_events.api_url, "status": result.status if result else None})
+
+        if societies is not None:
+            result = self._get(societies.api_url) if self._allowed(societies.api_url) else None
+            try:
+                groups = json.loads(result.text) if result and result.status == 200 else None
+            except json.JSONDecodeError:
+                groups = None
+            if isinstance(groups, list):
+                society_pages = _society_pages(groups, societies)
+                # These replace any HTML copies of the same pages.
+                replaced = {page["url"] for page in society_pages}
+                pages[:] = [page for page in pages if page["url"] not in replaced] + society_pages
+            else:
+                unavailable.append({"url": societies.api_url, "status": result.status if result else None})
         return {"pages": pages, "unavailable": unavailable}
 
 
@@ -418,6 +435,79 @@ def _student_event_pages(feed_html: str) -> list[dict]:
     return pages
 
 
+@dataclass(frozen=True)
+class SocietiesSource:
+    """Every Students' Union society, from the JSON feed behind the societies directory.
+
+    The directory page builds its list with JavaScript, so its HTML has no societies.
+    """
+
+    api_url: str
+    directory_page: str
+
+
+def _html_to_text(fragment: str) -> str:
+    soup = BeautifulSoup(fragment or "", "html.parser")
+    blocks = [_clean(node.get_text(" ")) for node in soup.find_all(["p", "li", "h1", "h2", "h3", "h4"])]
+    text = "\n".join(block for block in blocks if block)
+    return text or _clean(soup.get_text(" "))
+
+
+def _society_pages(groups: list, source: SocietiesSource) -> list[dict]:
+    pages = []
+    directory: dict[str, list[str]] = {}
+    for group in groups:
+        name = _clean(str(group.get("Name") or ""))
+        url = group.get("Url") or ""
+        if not name or not url:
+            continue
+        category = _clean(str(group.get("Category") or "Other"))
+        directory.setdefault(category, []).append(name)
+        article = "an" if category[:1].lower() in "aeiou" else "a"
+        lines = [f"{name} is {article} {category} society at the Heriot-Watt Students' Union."]
+        statuses = [v for a in group.get("Attributes") or [] if a.get("Set") == "Status" for v in a.get("Values", [])]
+        if statuses:
+            lines.append(f"Status: {', '.join(statuses)}")
+        if group.get("EmailAddress"):
+            lines.append(f"Contact: {group['EmailAddress']}")
+        if group.get("InstagramUsername"):
+            lines.append(f"Instagram: @{group['InstagramUsername'].lstrip('@')}")
+        for label, key in (("Facebook", "FacebookUrl"), ("Website", "WebsiteUrl")):
+            if group.get(key):
+                lines.append(f"{label}: {group[key]}")
+        description = _html_to_text(group.get("LongDescription") or group.get("Description") or "")
+        if description:
+            lines.append(description)
+        pages.append(
+            {
+                "title": f"{name} (society)",
+                "url": normalize_url(url),
+                "category": f"societies/{category.lower()}",
+                "site_label": "Heriot-Watt Students' Union",
+                "headings": [name],
+                "extracted_text": "\n".join(lines),
+            }
+        )
+    if directory:
+        lines = [
+            "All societies at the Heriot-Watt Students' Union, by category. Each society has its own "
+            "page with contact details and how to join."
+        ]
+        for category in sorted(directory):
+            lines.append(f"{category}: {', '.join(sorted(directory[category]))}")
+        pages.append(
+            {
+                "title": "Students' Union societies directory",
+                "url": normalize_url(source.directory_page),
+                "category": "societies",
+                "site_label": "Heriot-Watt Students' Union",
+                "headings": ["Societies directory"],
+                "extracted_text": "\n".join(lines),
+            }
+        )
+    return pages
+
+
 def _category(url: str) -> str:
     segments = [s for s in urlparse(url).path.split("/") if s]
     return "/".join(segments[:2]) if segments else "home"
@@ -491,6 +581,12 @@ PRODUCTION_STUDENT_EVENTS = StudentEventsSource(
 )
 
 
+PRODUCTION_SOCIETIES = SocietiesSource(
+    api_url="https://www.hwunion.com/svc/feeds/groups/6033?subtree=true&attributesets=Status",
+    directory_page="https://www.hwunion.com/get-involved/societies",
+)
+
+
 def http_fetch(user_agent: str, timeout_s: float = 20.0) -> Fetch:
     """A real fetcher: retries transient failures, identifies itself, follows redirects."""
     import requests
@@ -537,6 +633,7 @@ def main(argv: list[str] | None = None) -> int:
         seed_urls=PRODUCTION_SEEDS,
         library_hours=PRODUCTION_LIBRARY_HOURS,
         student_events=PRODUCTION_STUDENT_EVENTS,
+        societies=PRODUCTION_SOCIETIES,
     )
     corpus["collected_at"] = started.isoformat()
     corpus["total_pages"] = len(corpus["pages"])

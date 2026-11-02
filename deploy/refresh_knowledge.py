@@ -77,6 +77,7 @@ corpus = collector.collect(
     seed_urls=kc.PRODUCTION_SEEDS,
     library_hours=kc.PRODUCTION_LIBRARY_HOURS,
     student_events=kc.PRODUCTION_STUDENT_EVENTS,
+    societies=kc.PRODUCTION_SOCIETIES,
 )
 pages, unavailable = corpus['pages'], corpus['unavailable']
 corpus_path = snapshot / 'knowledge.json'
