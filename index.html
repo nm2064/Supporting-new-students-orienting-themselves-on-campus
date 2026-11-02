@@ -161,6 +161,8 @@
                 assistantIntro: "Hi! I'm UniBot. Ask me about library hours, parking, housing, services, and events.",
                 clear: "Clear",
                 quickQuestions: "Quick questions",
+                sources: "Sources",
+                sourcesConsulted: "Sources consulted",
                 language: "Language",
                 locationHint: "Main Library • 4 mins walk",
                 mapSearchDestination: "Search destination",
@@ -209,6 +211,8 @@
                 assistantIntro: "你好！我是 UniBot。你可以咨询图书馆、停车、住宿、服务和活动。",
                 clear: "清空",
                 quickQuestions: "快捷问题",
+                sources: "来源",
+                sourcesConsulted: "参考来源",
                 language: "语言",
                 locationHint: "主图书馆 • 步行4分钟",
                 mapSearchDestination: "搜索目的地",
@@ -257,6 +261,8 @@
                 assistantIntro: "नमस्ते! मैं UniBot हूँ। आप लाइब्रेरी, पार्किंग, हॉस्टल, सेवाओं और इवेंट्स के बारे में पूछ सकते हैं।",
                 clear: "साफ़ करें",
                 quickQuestions: "त्वरित प्रश्न",
+                sources: "स्रोत",
+                sourcesConsulted: "देखे गए स्रोत",
                 language: "भाषा",
                 locationHint: "मुख्य पुस्तकालय • 4 मिनट पैदल",
                 mapSearchDestination: "गंतव्य खोजें",
@@ -305,6 +311,8 @@
                 assistantIntro: "مرحبًا! أنا UniBot. اسألني عن ساعات المكتبة، المواقف، السكن، الخدمات والفعاليات.",
                 clear: "مسح",
                 quickQuestions: "أسئلة سريعة",
+                sources: "المصادر",
+                sourcesConsulted: "المصادر التي تمت مراجعتها",
                 language: "اللغة",
                 locationHint: "المكتبة الرئيسية • 4 دقائق مشيًا",
                 mapSearchDestination: "ابحث عن الوجهة",
@@ -505,6 +513,129 @@
         const STORAGE_CHAT_MESSAGES = "unibot_chat_messages";
         const STORAGE_CHAT_FOLLOWUPS = "unibot_chat_followups";
 
+        // ---- Answer rendering: a small, safe Markdown subset -------------------
+        // Builds React elements only (never raw HTML). Links are rendered only
+        // for http(s) URLs. [n] markers link to citation n.
+
+        const isWebUrl = (value) => typeof value === "string" && /^https?:\/\//i.test(value);
+
+        const citationUrl = (citation) => citation ? (citation.url || citation.source_url || citation.source || "") : "";
+
+        const citationTitle = (citation, index) => {
+            const title = citation && citation.title;
+            if (title && title !== citationUrl(citation)) return title;
+            const url = citationUrl(citation);
+            if (isWebUrl(url)) {
+                try {
+                    const parsed = new URL(url);
+                    return parsed.hostname.replace(/^www\./, "") + parsed.pathname.replace(/\/$/, "");
+                } catch (e) {}
+            }
+            return `Source ${index + 1}`;
+        };
+
+        const findCitation = (citations, number) => {
+            const list = citations || [];
+            const exact = list.find((c) => c && c.number === number);
+            return exact || (list[number - 1] && list[number - 1].number === undefined ? list[number - 1] : null);
+        };
+
+        const INLINE_PATTERN = /(\*\*[^*]+\*\*|\[[^\]]+\]\((?:https?:\/\/)[^)\s]+\)|\[\d+\]|https?:\/\/[^\s)\]]+)/g;
+
+        const renderInline = (text, citations, keyPrefix) => {
+            const parts = String(text).split(INLINE_PATTERN);
+            return parts.map((part, i) => {
+                const key = `${keyPrefix}-${i}`;
+                if (!part) return null;
+                if (part.startsWith("**") && part.endsWith("**") && part.length > 4) {
+                    return <strong key={key}>{part.slice(2, -2)}</strong>;
+                }
+                const markdownLink = part.match(/^\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)$/i);
+                if (markdownLink) {
+                    return <a key={key} href={markdownLink[2]} target="_blank" rel="noopener noreferrer" className="text-primary underline break-words">{markdownLink[1]}</a>;
+                }
+                const marker = part.match(/^\[(\d+)\]$/);
+                if (marker) {
+                    const number = parseInt(marker[1], 10);
+                    const citation = findCitation(citations, number);
+                    const url = citationUrl(citation);
+                    if (!citation) return <span key={key}>{part}</span>;
+                    return isWebUrl(url)
+                        ? <a key={key} href={url} target="_blank" rel="noopener noreferrer" title={citationTitle(citation, number - 1)} className="align-super text-[10px] font-semibold text-primary no-underline px-0.5">[{number}]</a>
+                        : <sup key={key} className="text-[10px] font-semibold">[{number}]</sup>;
+                }
+                if (isWebUrl(part)) {
+                    return <a key={key} href={part} target="_blank" rel="noopener noreferrer" className="text-primary underline break-all">{part}</a>;
+                }
+                return <React.Fragment key={key}>{part}</React.Fragment>;
+            });
+        };
+
+        const AnswerBody = ({ text, citations }) => {
+            const blocks = [];
+            let list = null;
+            const flushList = () => {
+                if (list) {
+                    const items = list.items;
+                    blocks.push(list.ordered
+                        ? <ol key={`b${blocks.length}`} className="list-decimal ps-5 space-y-1">{items}</ol>
+                        : <ul key={`b${blocks.length}`} className="list-disc ps-5 space-y-1">{items}</ul>);
+                    list = null;
+                }
+            };
+            String(text || "").split("\n").forEach((rawLine, lineIndex) => {
+                const line = rawLine.trimEnd();
+                const key = `l${lineIndex}`;
+                const bullet = line.match(/^\s*[-*•]\s+(.*)$/);
+                const numbered = line.match(/^\s*\d+[.)]\s+(.*)$/);
+                if (bullet || numbered) {
+                    const ordered = !!numbered && !bullet;
+                    if (!list || list.ordered !== ordered) { flushList(); list = { ordered, items: [] }; }
+                    list.items.push(<li key={key}>{renderInline((bullet || numbered)[1], citations, key)}</li>);
+                    return;
+                }
+                flushList();
+                const heading = line.match(/^\s*#{1,4}\s+(.*)$/);
+                if (heading) {
+                    blocks.push(<p key={key} className="font-semibold mt-2">{renderInline(heading[1], citations, key)}</p>);
+                } else if (line.trim() === "") {
+                    blocks.push(<div key={key} className="h-2" />);
+                } else {
+                    blocks.push(<p key={key}>{renderInline(line, citations, key)}</p>);
+                }
+            });
+            flushList();
+            return <div className="text-sm leading-relaxed space-y-1 break-words">{blocks}</div>;
+        };
+
+        const SourceList = ({ citations, text, labels }) => {
+            const list = (citations || []).filter(Boolean);
+            if (list.length === 0) return null;
+            const citedInline = /\[\d+\]/.test(text || "");
+            return (
+                <div className="mt-3 border-t border-gray-300/40 pt-2">
+                    <p className="text-[11px] uppercase tracking-wide text-gray-500 mb-1">
+                        {citedInline ? labels.sources : labels.sourcesConsulted}
+                    </p>
+                    <ol className="space-y-1">
+                        {list.map((citation, index) => {
+                            const number = citation.number || index + 1;
+                            const url = citationUrl(citation);
+                            const title = citationTitle(citation, index);
+                            return (
+                                <li key={index} className="text-xs flex gap-1.5">
+                                    <span className="font-semibold text-gray-500">[{number}]</span>
+                                    {isWebUrl(url)
+                                        ? <a href={url} target="_blank" rel="noopener noreferrer" className="text-primary underline break-words">{title}</a>
+                                        : <span>{title}</span>}
+                                </li>
+                            );
+                        })}
+                    </ol>
+                </div>
+            );
+        };
+
         const ChatPage = () => {
             const t = useT();
             const { uiLanguage, autoDetectEnabled, setSessionDetectedLanguage } = useLanguage();
@@ -531,7 +662,6 @@
             });
             const [lastEffectiveLanguage, setLastEffectiveLanguage] = useState(null);
             const [lastConfidence, setLastConfidence] = useState(null);
-            const [expandedCitations, setExpandedCitations] = useState({});
 
             useEffect(() => {
                 try { localStorage.setItem(STORAGE_CHAT_MESSAGES, JSON.stringify(messages)); } catch (e) {}
@@ -658,29 +788,15 @@
                                 return (
                                     <div key={idx} className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
                                         <div className={`max-w-[85%] rounded-2xl px-4 py-3 ${isUser ? "bg-primary text-white" : "bg-gray-100 dark:bg-gray-800"}`}>
-                                            <div className="whitespace-pre-wrap text-sm leading-relaxed">
-                                                {isUser ? msg.text : msg.text.split(/(\*\*[^*]+\*\*)/g).map((part, partIndex) =>
-                                                    part.startsWith("**") && part.endsWith("**")
-                                                        ? <strong key={partIndex}>{part.slice(2, -2)}</strong>
-                                                        : part)}
-                                            </div>
-                                            {msg.citations && msg.citations.length > 0 && (
-                                                <div className="mt-2 border-t border-gray-300/40 pt-2">
-                                                    <button onClick={() => setExpandedCitations((prev) => ({ ...prev, [idx]: !prev[idx] }))} className="text-xs text-primary">
-                                                        {expandedCitations[idx] ? "Hide citations" : "Show citations"}
-                                                    </button>
-                                                    {expandedCitations[idx] && (
-                                                        <div className="mt-2 space-y-2">
-                                                            {msg.citations.map((c, cIdx) => (
-                                                                <div key={cIdx} className="text-xs bg-white/60 dark:bg-black/20 rounded-md p-2">
-                                                                    {/^https?:\/\//i.test(c.source_url || c.source || "")
-                                                                        ? <a href={c.source_url || c.source} target="_blank" rel="noopener noreferrer" className="text-primary underline">View source {cIdx + 1}</a>
-                                                                        : <span>Source unavailable</span>}
-                                                                </div>
-                                                            ))}
-                                                        </div>
-                                                    )}
-                                                </div>
+                                            {isUser
+                                                ? <div className="whitespace-pre-wrap text-sm leading-relaxed">{msg.text}</div>
+                                                : <AnswerBody text={msg.text} citations={msg.citations} />}
+                                            {!isUser && (
+                                                <SourceList
+                                                    citations={msg.citations}
+                                                    text={msg.text}
+                                                    labels={{ sources: t.sources, sourcesConsulted: t.sourcesConsulted }}
+                                                />
                                             )}
                                         </div>
                                     </div>
