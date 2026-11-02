@@ -34,6 +34,34 @@ LANGUAGE_LABELS = {
 }
 DEFAULT_CAMPUS = "Edinburgh"
 
+GROUNDED_ANSWER_INSTRUCTIONS = """\
+You are UniBot, the Heriot-Watt University assistant for new and current students.
+Answer using ONLY the numbered evidence passages, which come from official university pages.
+
+How to answer:
+- Answer the student's actual question directly in the first sentence.
+- Then be thorough. Include every relevant detail the evidence gives: steps in order, \
+deadlines, dates and opening times, costs, eligibility, locations, contact details, and \
+the pages the student should visit. Use short headed sections or bullet lists when there \
+are several points.
+- Put a citation marker such as [1] or [2][3] straight after each factual claim, using \
+the evidence numbers. Never cite a number that is not in the evidence. Never invent \
+facts, links, phone numbers or email addresses.
+- If the evidence only partly answers the question, answer that part, say clearly what it \
+does not cover, and point to the most relevant cited page or service.
+- If the evidence does not answer the question at all, say so plainly and suggest who to contact.
+- Assume the {campus} campus unless the student names another. If the evidence is about a \
+different campus, say so.
+- Write answer_markdown and follow_up_suggestions in {language}. Keep citation markers, \
+URLs and proper names unchanged.
+
+Return a JSON object with keys:
+answer_markdown (string, Markdown),
+follow_up_suggestions (array of up to 3 short questions the student might ask next),
+needs_human_handoff (boolean, true when the student should contact university staff),
+confidence (number from 0 to 1: how fully the evidence answers the question).
+"""
+
 
 @dataclass
 class Chunk:
@@ -42,6 +70,7 @@ class Chunk:
     chunk_id: str
     start_pos: int = 0
     end_pos: int = 0
+    title: str = ""
 
 
 @dataclass
@@ -127,6 +156,21 @@ def _normalize_campus(campus: str | None) -> str:
 
 # Backwards-compatible name: the gateway lives in llm.py.
 OpenAIBackend = LLMGateway
+
+
+class GoogleTranslatorAdapter:
+    """Machine-translation adapter backed by Google Translate (deep-translator).
+
+    ``translate`` raises on failure; callers decide how to degrade.
+    """
+
+    _LANGUAGE_CODES: dict[str, str] = {"zh-Hans": "zh-CN", "hi": "hi", "ar": "ar", "en": "en"}
+
+    def translate(self, text: str, source_language: str, target_language: str) -> str:
+        return GoogleTranslator(
+            source=self._LANGUAGE_CODES.get(source_language, source_language),
+            target=self._LANGUAGE_CODES.get(target_language, target_language),
+        ).translate(text)
 
 
 class DocumentProcessor:
@@ -287,6 +331,7 @@ class DocumentProcessor:
                         chunk_id=f"page_{page_index:04d}_chunk_{part_index:02d}_{chunk_index:04d}",
                         start_pos=start,
                         end_pos=end,
+                        title=title,
                     )
                 )
                 chunk_index += 1
@@ -344,6 +389,7 @@ class VectorStore:
                         "chunk_id": chunk.chunk_id,
                         "start_pos": chunk.start_pos,
                         "end_pos": chunk.end_pos,
+                        "title": chunk.title,
                     }
                     for chunk in batch
                 ],
@@ -396,6 +442,7 @@ class VectorStore:
                         chunk_id=metadata.get("chunk_id", "unknown_chunk"),
                         start_pos=metadata.get("start_pos", 0),
                         end_pos=metadata.get("end_pos", 0),
+                        title=metadata.get("title", "") or "",
                     ),
                     score=1 - distance,
                 )
@@ -523,21 +570,30 @@ class AgenticRAG:
         vector_store: VectorStore,
         document_processor: DocumentProcessor,
         session_store: SessionStore | None = None,
+        translator: Any | None = None,
     ):
         self.settings = settings
         self.backend = backend
         self.vector_store = vector_store
         self.document_processor = document_processor
         self.session_store = session_store or SessionStore()
+        self.translator = translator or GoogleTranslatorAdapter()
 
     @classmethod
-    def from_settings(cls, settings: AppSettings) -> "AgenticRAG":
-        backend = OpenAIBackend(settings)
+    def from_settings(
+        cls,
+        settings: AppSettings,
+        llm: Any | None = None,
+        translator: Any | None = None,
+    ) -> "AgenticRAG":
+        """Build the assistant. ``llm`` and ``translator`` default to the real adapters."""
+        backend = llm or LLMGateway(settings)
         return cls(
             settings=settings,
             backend=backend,
             vector_store=VectorStore(settings, backend),
             document_processor=DocumentProcessor(settings),
+            translator=translator,
         )
 
     def ingest(self, force: bool = False) -> dict[str, Any]:
@@ -596,27 +652,16 @@ class AgenticRAG:
             logger.debug("Language detection failed: %s", error)
             return "en", 0.0
 
-    # Map internal language codes to Google Translate language codes
-    _GOOGLE_LANG_MAP: dict[str, str] = {
-        "zh-Hans": "zh-CN",
-        "hi": "hi",
-        "ar": "ar",
-        "en": "en",
-    }
-
     def _translate_text(self, text: str, source_lang: str, target_lang: str) -> str:
+        """Best-effort machine translation; returns the original text on failure."""
         if not text or source_lang == target_lang:
             return text
-
-        google_source = self._GOOGLE_LANG_MAP.get(source_lang, source_lang)
-        google_target = self._GOOGLE_LANG_MAP.get(target_lang, target_lang)
-
         try:
-            translated = GoogleTranslator(source=google_source, target=google_target).translate(text)
+            translated = self.translator.translate(text, source_lang, target_lang)
             return translated if translated and translated.strip() else text
         except Exception as error:
             logger.warning(
-                "Google translation failed (%s→%s): %s", source_lang, target_lang, error
+                "Machine translation failed (%s→%s): %s", source_lang, target_lang, type(error).__name__
             )
             return text
 
@@ -769,13 +814,20 @@ class AgenticRAG:
             "confidence": max(0.0, min(1.0, confidence)),
         }
 
-    def _grounded_answer_en(
+    def _grounded_answer(
         self,
+        query: str,
         query_en: str,
         relevant_chunks: list[RetrievedChunk],
         chat_history: list[dict[str, Any]],
         campus: str,
+        language: str,
     ) -> dict[str, Any]:
+        """Answer from the evidence, written directly in ``language``.
+
+        Returns the usual answer payload plus ``written_in``: the language the
+        text is already in, so it is not machine-translated afterwards.
+        """
         if not relevant_chunks:
             return {
                 "answer_markdown": (
@@ -792,26 +844,24 @@ class AgenticRAG:
             }
 
         evidence_text = "\n\n".join(
-            f"[{index}] chunk_id={chunk.chunk.chunk_id} source={chunk.chunk.source}\n{chunk.chunk.text}"
+            f"[{index}] {chunk.chunk.title or 'Untitled page'} ({chunk.chunk.source})\n{chunk.chunk.text}"
             for index, chunk in enumerate(relevant_chunks, start=1)
         )
         recent = chat_history[-6:] if chat_history else []
         history_text = "\n".join(f"{message['role']}: {message['content']}" for message in recent)
+        language_label = LANGUAGE_LABELS.get(language, "English")
+        question_lines = f"Student's question: {query}"
+        if query_en.strip() != query.strip():
+            question_lines += f"\nEnglish translation of the question: {query_en}"
         result = self.backend.chat_json(
-            system_prompt=(
-                "You are a university RAG assistant. Return JSON with keys: "
-                "answer_markdown, follow_up_suggestions (array), needs_human_handoff (bool), confidence (0-1). "
-                "Only make factual claims grounded in evidence. "
-                "For factual claims include citation markers [1], [2], etc. "
-                "If evidence is missing, explicitly say that information is unavailable."
-            ),
+            system_prompt=GROUNDED_ANSWER_INSTRUCTIONS.format(campus=campus, language=language_label),
             user_prompt=(
-                f"Default campus context: {campus}. Assume this campus unless the user explicitly mentions another campus.\n\n"
-                f"Evidence:\n{evidence_text}\n\n"
-                f"History:\n{history_text}\n\n"
-                f"User query: {query_en}"
+                f"Evidence from official Heriot-Watt pages:\n{evidence_text}\n\n"
+                f"Conversation so far:\n{history_text or '(none)'}\n\n"
+                f"{question_lines}"
             ),
             model=self.settings.chat_model,
+            max_tokens=self.settings.answer_max_tokens,
         )
         answer = str(result.get("answer_markdown", "")).strip()
         if not answer:
@@ -828,46 +878,77 @@ class AgenticRAG:
             "follow_up_suggestions": [str(item) for item in follow_ups][:3],
             "needs_human_handoff": bool(result.get("needs_human_handoff", False)),
             "confidence": max(0.0, min(1.0, confidence)),
+            "written_in": language,
         }
 
-    @staticmethod
-    def _extract_citation_indices(answer_markdown: str, max_index: int) -> list[int]:
-        seen: set[int] = set()
-        for match in re.finditer(r"\[(\d+)\]", answer_markdown):
-            index = int(match.group(1)) - 1
-            if 0 <= index < max_index:
-                seen.add(index)
-        if not seen and max_index > 0:
-            seen = {0}
-        return sorted(seen)
+    # "[3]" or a grouped "[1, 4]", with any whitespace in front of it.
+    _MARKER = re.compile(r"(\s*)\[(\d+(?:\s*,\s*\d+)*)\]")
 
-    def _build_citation_payloads(
+    def _cite_pages(
         self,
         relevant_chunks: list[RetrievedChunk],
         answer_markdown: str,
-    ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    ) -> tuple[str, list[dict[str, Any]], list[dict[str, Any]]]:
+        """Renumber evidence markers as citations in order of first use.
+
+        Returns the rewritten answer, the citations (number, title, url) and the
+        matching source excerpts, so every [n] in the text has a citation n.
+        Markers that point at no evidence are dropped.
+        """
+        number_for_page: dict[str, int] = {}
         citations: list[dict[str, Any]] = []
         sources: list[dict[str, Any]] = []
-        for index in self._extract_citation_indices(answer_markdown, len(relevant_chunks)):
-            retrieved_chunk = relevant_chunks[index]
-            citations.append(
-                {
-                    "chunk_id": retrieved_chunk.chunk.chunk_id,
-                    "source_url": retrieved_chunk.chunk.source,
-                }
-            )
-            excerpt = retrieved_chunk.chunk.text[:220]
-            if len(retrieved_chunk.chunk.text) > 220:
-                excerpt += "..."
-            sources.append(
-                {
-                    "source": retrieved_chunk.chunk.source,
-                    "chunk_id": retrieved_chunk.chunk.chunk_id,
-                    "excerpt": excerpt,
-                    "score": round(float(retrieved_chunk.score), 4),
-                }
-            )
-        return citations, sources
+
+        def rewrite(match: re.Match[str]) -> str:
+            numbers: list[int] = []
+            for part in match.group(2).split(","):
+                number = cite(int(part) - 1)
+                if number is not None and number not in numbers:
+                    numbers.append(number)
+            if not numbers:
+                return ""
+            return match.group(1) + "".join(f"[{number}]" for number in numbers)
+
+        def cite(index: int) -> int | None:
+            if not 0 <= index < len(relevant_chunks):
+                return None
+            retrieved = relevant_chunks[index]
+            chunk = retrieved.chunk
+            if chunk.source not in number_for_page:
+                number_for_page[chunk.source] = len(number_for_page) + 1
+                citations.append(
+                    {
+                        "number": number_for_page[chunk.source],
+                        "title": chunk.title or chunk.source,
+                        "url": chunk.source,
+                        "chunk_id": chunk.chunk_id,
+                        "source_url": chunk.source,
+                    }
+                )
+                sources.append(
+                    {
+                        "source": chunk.source,
+                        "chunk_id": chunk.chunk_id,
+                        "excerpt": chunk.text[:220] + ("..." if len(chunk.text) > 220 else ""),
+                        "score": round(float(retrieved.score), 4),
+                    }
+                )
+            return number_for_page[chunk.source]
+
+        rewritten = self._MARKER.sub(rewrite, answer_markdown)
+        if not citations:
+            # The answer drew on the knowledge base but cited nothing inline:
+            # still show the best-matching pages it was given, so the student
+            # can check the claims.
+            for index in sorted(
+                range(len(relevant_chunks)), key=lambda i: relevant_chunks[i].score, reverse=True
+            ):
+                if len(number_for_page) >= self._MAX_CONSULTED_SOURCES:
+                    break
+                cite(index)
+        return rewritten, citations, sources
+
+    _MAX_CONSULTED_SOURCES = 3
 
     def chat(
         self,
@@ -921,23 +1002,10 @@ class AgenticRAG:
             effective_language=effective_language,
         )
 
-        translation_notice = ""
-        query_en = query
-        if effective_language != "en":
-            try:
-                query_en = self._translate_text(query, effective_language, "en")
-            except Exception as error:
-                translation_notice = "Note: translation failed, so I replied in English."
-                effective_language = "en"
-                query_en = query
-                log_event(
-                    logger,
-                    "translation_error",
-                    level=logging.WARNING,
-                    stage="query_to_en",
-                    conversation_id=conversation_id,
-                    error=str(error),
-                )
+        # English version of the question, used for routing and retrieval. If
+        # machine translation is unavailable this is the original text; the
+        # original-language search below still finds multilingual matches.
+        query_en = self._translate_text(query, effective_language, "en")
 
         decision = self._router_decision(query_en, history, was_translated=effective_language != "en")
         relevant_chunks: list[RetrievedChunk] = []
@@ -985,11 +1053,13 @@ class AgenticRAG:
             ]
             if not relevant_chunks:
                 relevant_chunks = retrieved[: self.settings.top_k]
-            answer_payload = self._grounded_answer_en(
+            answer_payload = self._grounded_answer(
+                query,
                 query_en,
                 relevant_chunks,
                 history,
                 effective_campus,
+                effective_language,
             )
 
         answer_markdown = answer_payload["answer_markdown"]
@@ -997,37 +1067,20 @@ class AgenticRAG:
         needs_handoff = bool(answer_payload.get("needs_human_handoff", False))
         confidence = float(answer_payload.get("confidence", 0.5))
 
-        citations, sources = self._build_citation_payloads(relevant_chunks, answer_markdown)
+        answer_markdown, citations, sources = self._cite_pages(relevant_chunks, answer_markdown)
 
-        if effective_language != "en":
-            try:
-                if answer_markdown:
-                    translated = self._translate_text(answer_markdown, "en", effective_language)
-                    answer_markdown = translated if translated.strip() else answer_markdown
-                if clarifying:
-                    translated_clarifying = self._translate_text(clarifying, "en", effective_language)
-                    clarifying = translated_clarifying if translated_clarifying.strip() else clarifying
-                follow_ups = [
-                    self._translate_text(str(suggestion), "en", effective_language)
-                    for suggestion in follow_ups[:3]
-                ]
-            except Exception as error:
-                effective_language = "en"
-                translation_notice = "Note: translation failed, so I replied in English."
-                log_event(
-                    logger,
-                    "translation_error",
-                    level=logging.WARNING,
-                    stage="answer_from_en",
-                    conversation_id=conversation_id,
-                    error=str(error),
-                )
-
-        if translation_notice:
-            if answer_markdown:
-                answer_markdown = f"{answer_markdown}\n\n_{translation_notice}_"
-            else:
-                answer_markdown = translation_notice
+        # Grounded answers are written in the reply language by the model, so
+        # citation markers stay intact. Only fixed English text (greetings,
+        # clarifying questions) is machine-translated.
+        written_in = answer_payload.get("written_in", "en")
+        if written_in != effective_language:
+            answer_markdown = self._translate_text(answer_markdown, written_in, effective_language)
+            follow_ups = [
+                self._translate_text(str(suggestion), written_in, effective_language)
+                for suggestion in follow_ups[:3]
+            ]
+        if clarifying:
+            clarifying = self._translate_text(clarifying, "en", effective_language)
 
         log_event(
             logger,

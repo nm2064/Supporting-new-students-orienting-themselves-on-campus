@@ -78,6 +78,7 @@ class AppSettings:
     chat_temperature: float
     chat_max_tokens: int
     chat_reasoning_effort: str
+    answer_max_tokens: int
     language_detection_confidence_threshold: float
     chunk_size: int
     chunk_overlap: int
@@ -130,6 +131,7 @@ class AppSettings:
             chat_temperature=_read_float("CHAT_TEMPERATURE", 0.2),
             chat_max_tokens=_read_int("CHAT_MAX_TOKENS", 1200),
             chat_reasoning_effort=os.getenv("CHAT_REASONING_EFFORT", "low").strip().lower(),
+            answer_max_tokens=_read_int("ANSWER_MAX_TOKENS", 3000),
             language_detection_confidence_threshold=_read_float(
                 "LANGUAGE_DETECTION_CONFIDENCE_THRESHOLD",
                 0.9,
