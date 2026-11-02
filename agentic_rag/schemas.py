@@ -41,8 +41,11 @@ class Source(BaseModel):
 
 
 class Citation(BaseModel):
+    number: int = Field(description="Matches the [n] marker in answer_markdown")
+    title: str = Field(description="Title of the cited page")
+    url: str = Field(description="Link to the cited page")
     chunk_id: str
-    source_url: str
+    source_url: str = Field(description="Legacy alias of url")
 
 
 class ChatResponse(BaseModel):

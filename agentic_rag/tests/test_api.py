@@ -117,3 +117,38 @@ def test_rag_chat_accepts_legacy_fields():
         "campus": None,
         "location_context": None,
     }
+
+
+class CitingRag(FakeRag):
+    def chat(self, query, session_id=None, ui_language="en", auto_detect=True, campus=None, location_context=None):
+        return RagResponse(
+            answer_markdown="The library is open 24 hours a day during term [1].",
+            effective_language="en",
+            answer="The library is open 24 hours a day during term [1].",
+            citations=[
+                {
+                    "number": 1,
+                    "title": "Library opening hours",
+                    "url": "https://www.hw.ac.uk/uk/students/library/opening-hours",
+                    "chunk_id": "page_0000_chunk_00_0000",
+                    "source_url": "https://www.hw.ac.uk/uk/students/library/opening-hours",
+                }
+            ],
+            used_retrieval=True,
+            conversation_id="c1",
+            session_id="c1",
+        )
+
+
+def test_rag_chat_returns_numbered_citations_with_title_and_link():
+    app = create_app()
+    app.dependency_overrides[get_rag] = lambda: CitingRag()
+    client = TestClient(app)
+
+    response = client.post("/rag-chat", json={"message": "When is the library open?"})
+
+    assert response.status_code == 200
+    citation = response.json()["citations"][0]
+    assert citation["number"] == 1
+    assert citation["title"] == "Library opening hours"
+    assert citation["url"] == "https://www.hw.ac.uk/uk/students/library/opening-hours"
