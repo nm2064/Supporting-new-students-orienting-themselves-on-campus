@@ -68,3 +68,14 @@ def test_reset_changes_cookie_and_clears_server_conversation(monkeypatch, tmp_pa
     assert c.post('/reset-chat').status_code == 200
     fake.clear_session.assert_called_once_with(previous)
     assert c.post('/rag-chat').json()['session'] != previous
+
+
+def test_starting_a_new_conversation_does_not_use_up_the_ai_request_allowance(monkeypatch, tmp_path):
+    from unittest.mock import Mock
+    from agentic_rag import rag
+    monkeypatch.setattr(rag, 'rag_instance', Mock())
+    c = client(monkeypatch, tmp_path, limit=2)
+    for _ in range(15):  # e.g. a visitor reloading the page many times
+        assert c.post('/reset-chat').status_code == 200
+    assert c.post('/rag-chat').status_code == 200
+    assert c.post('/rag-chat').status_code == 200

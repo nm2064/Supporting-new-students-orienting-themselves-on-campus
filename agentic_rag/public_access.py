@@ -14,6 +14,31 @@ def public_mode():
 
 
 class PublicAccessMiddleware(BaseHTTPMiddleware):
+    @staticmethod
+    def _consume_request_allowance(request):
+        """Count one AI request against the per-IP and daily limits.
+
+        Returns a 429 response when a limit is reached, otherwise None.
+        Counters persist in SQLite, so restarts do not reset them.
+        """
+        now = int(time.time())
+        dbpath = Path(os.getenv("PUBLIC_LIMIT_DB", "/var/lib/unibot/limits.sqlite3"))
+        dbpath.parent.mkdir(parents=True, exist_ok=True)
+        ip = request.client.host if request.client else "unknown"
+        with sqlite3.connect(dbpath, timeout=5) as db:
+            db.execute("CREATE TABLE IF NOT EXISTS limits (bucket TEXT PRIMARY KEY, n INTEGER NOT NULL, expiry INTEGER NOT NULL)")
+            db.execute("BEGIN IMMEDIATE")
+            db.execute("DELETE FROM limits WHERE expiry < ?", (now,))
+            buckets = [(f"ip:{ip}:{now//60}", 10, (now//60+1)*60),
+                       (f"day:{now//86400}", int(os.getenv("PUBLIC_DAILY_REQUEST_LIMIT", "200")), (now//86400+1)*86400)]
+            for key, limit, expiry in buckets:
+                row = db.execute("SELECT n FROM limits WHERE bucket=?", (key,)).fetchone()
+                if row and row[0] >= limit:
+                    return JSONResponse({"detail": "Demo request limit reached. Please try again later."}, status_code=429, headers={"Retry-After": str(expiry-now)})
+            for key, _, expiry in buckets:
+                db.execute("INSERT INTO limits VALUES (?,1,?) ON CONFLICT(bucket) DO UPDATE SET n=n+1", (key, expiry))
+        return None
+
     async def dispatch(self, request, call_next):
         path = request.url.path
         if path in {"/ingest", "/docs", "/redoc", "/openapi.json", "/health"} or path.startswith("/session/"):
@@ -40,22 +65,12 @@ class PublicAccessMiddleware(BaseHTTPMiddleware):
                 return JSONResponse({"detail": "Invalid content length"}, status_code=400)
             if length > 16384:
                 return JSONResponse({"detail": "Request too large"}, status_code=413)
-            now = int(time.time())
-            dbpath = Path(os.getenv("PUBLIC_LIMIT_DB", "/var/lib/unibot/limits.sqlite3"))
-            dbpath.parent.mkdir(parents=True, exist_ok=True)
-            ip = request.client.host if request.client else "unknown"
-            with sqlite3.connect(dbpath, timeout=5) as db:
-                db.execute("CREATE TABLE IF NOT EXISTS limits (bucket TEXT PRIMARY KEY, n INTEGER NOT NULL, expiry INTEGER NOT NULL)")
-                db.execute("BEGIN IMMEDIATE")
-                db.execute("DELETE FROM limits WHERE expiry < ?", (now,))
-                buckets = [(f"ip:{ip}:{now//60}", 10, (now//60+1)*60),
-                           (f"day:{now//86400}", int(os.getenv("PUBLIC_DAILY_REQUEST_LIMIT", "200")), (now//86400+1)*86400)]
-                for key, limit, expiry in buckets:
-                    row = db.execute("SELECT n FROM limits WHERE bucket=?", (key,)).fetchone()
-                    if row and row[0] >= limit:
-                        return JSONResponse({"detail": "Demo request limit reached. Please try again later."}, status_code=429, headers={"Retry-After": str(expiry-now)})
-                for key, _, expiry in buckets:
-                    db.execute("INSERT INTO limits VALUES (?,1,?) ON CONFLICT(bucket) DO UPDATE SET n=n+1", (key, expiry))
+            # The limits protect AI quota. Starting a new conversation (sent on
+            # every page load) costs no AI calls, so it does not count.
+            if path != "/reset-chat":
+                limited = self._consume_request_allowance(request)
+                if limited is not None:
+                    return limited
             # Session IDs come from a signed, HTTP-only browser cookie, not user input.
             import hashlib
             import hmac

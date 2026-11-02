@@ -512,6 +512,18 @@
 
         const STORAGE_CHAT_MESSAGES = "unibot_chat_messages";
         const STORAGE_CHAT_FOLLOWUPS = "unibot_chat_followups";
+        const STORAGE_CONVERSATION_ID = "unibot_conversation_id";
+
+        // Every page load (reload or new visit) starts a new conversation:
+        // forget the saved transcript and ask the server for a fresh session
+        // so it drops the previous history. The transcript is still kept in
+        // localStorage while moving between pages within this load.
+        try {
+            localStorage.removeItem(STORAGE_CHAT_MESSAGES);
+            localStorage.removeItem(STORAGE_CHAT_FOLLOWUPS);
+            localStorage.removeItem(STORAGE_CONVERSATION_ID);
+        } catch (e) {}
+        const newConversationReady = fetch(`${API_BASE}/reset-chat`, { method: "POST" }).catch(() => null);
 
         // ---- Answer rendering: a small, safe Markdown subset -------------------
         // Builds React elements only (never raw HTML). Links are rendered only
@@ -714,10 +726,10 @@
             }, [t.assistantIntro]);
 
             const getConversationId = () => {
-                let id = localStorage.getItem("unibot_conversation_id");
+                let id = localStorage.getItem(STORAGE_CONVERSATION_ID);
                 if (!id) {
                     id = (typeof crypto !== "undefined" && crypto.randomUUID) ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`;
-                    localStorage.setItem("unibot_conversation_id", id);
+                    localStorage.setItem(STORAGE_CONVERSATION_ID, id);
                 }
                 return id;
             };
@@ -730,6 +742,8 @@
                 setMessages((prev) => [...prev, { role: "user", text: userText }]);
 
                 try {
+                    // Make sure the server has started the new conversation first.
+                    await newConversationReady;
                     const res = await fetch(`${API_BASE}/rag-chat`, {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
@@ -794,7 +808,7 @@
                 setMessages(initial);
                 setFollowUps([]);
                 try {
-                    localStorage.removeItem("unibot_conversation_id");
+                    localStorage.removeItem(STORAGE_CONVERSATION_ID);
                     localStorage.setItem(STORAGE_CHAT_MESSAGES, JSON.stringify(initial));
                     localStorage.removeItem(STORAGE_CHAT_FOLLOWUPS);
                 } catch (e) {}
