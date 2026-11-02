@@ -5,7 +5,8 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
+from starlette.concurrency import run_in_threadpool
 
 from .config import validate_config
 from .rag import AgenticRAG, get_rag
@@ -64,7 +65,7 @@ async def ingest(request: IngestRequest, rag: RagDep) -> IngestResponse:
 
 
 @router.post("/rag-chat", response_model=ChatResponse)
-async def rag_chat(request: ChatRequest, rag: RagDep) -> ChatResponse:
+async def rag_chat(request: ChatRequest, rag: RagDep, http_request: Request) -> ChatResponse:
     try:
         validate_config()
     except ConfigurationError as error:
@@ -75,9 +76,12 @@ async def rag_chat(request: ChatRequest, rag: RagDep) -> ChatResponse:
         raise HTTPException(status_code=400, detail="Message cannot be empty")
 
     conversation_id = request.conversation_id or request.session_id
+    if hasattr(http_request.state, "public_session"):
+        conversation_id = http_request.state.public_session
 
     try:
-        response = rag.chat(
+        response = await run_in_threadpool(
+            rag.chat,
             query=normalized_message,
             session_id=conversation_id,
             ui_language=request.ui_language,
@@ -102,7 +106,9 @@ async def rag_chat(request: ChatRequest, rag: RagDep) -> ChatResponse:
     except HTTPException:
         raise
     except Exception as error:
-        raise HTTPException(status_code=500, detail=f"Chat processing failed: {error}") from error
+        import logging
+        logging.getLogger(__name__).error("Chat request failed (%s)", type(error).__name__)
+        raise HTTPException(status_code=503, detail="The assistant is temporarily unavailable. Please try again shortly.") from error
 
 
 @router.get("/session/{session_id}")

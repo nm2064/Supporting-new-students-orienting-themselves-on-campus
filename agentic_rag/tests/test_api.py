@@ -87,6 +87,14 @@ def test_health_endpoint_reports_backend_state():
     assert "configuration_valid" in payload
 
 
+def test_direct_frontend_links_support_browser_refresh():
+    client, _ = _client_with_overrides()
+    for path in ['/chat', '/map', '/services', '/events', '/onboarding']:
+        response = client.get(path)
+        assert response.status_code == 200
+        assert 'text/html' in response.headers['content-type']
+
+
 def test_rag_chat_accepts_legacy_fields():
     client, rag = _client_with_overrides()
 

@@ -16,6 +16,7 @@ from .config import validate_config
 from .logging_utils import configure_logging
 from .maps.router import router as maps_router
 from .settings import get_settings
+from .public_access import PublicAccessMiddleware, public_mode
 
 # Root of the whole project (one level above this package)
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -44,13 +45,16 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=["*"],
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
+    if public_mode():
+        app.add_middleware(PublicAccessMiddleware)
+    else:
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=["*"],
+            allow_credentials=True,
+            allow_methods=["*"],
+            allow_headers=["*"],
+        )
 
     app.include_router(api_router)
     app.include_router(maps_router)
@@ -65,6 +69,11 @@ def create_app() -> FastAPI:
     index_file = PROJECT_ROOT / "index.html"
 
     @app.get("/", include_in_schema=False)
+    @app.get("/chat", include_in_schema=False)
+    @app.get("/map", include_in_schema=False)
+    @app.get("/services", include_in_schema=False)
+    @app.get("/events", include_in_schema=False)
+    @app.get("/onboarding", include_in_schema=False)
     async def serve_frontend() -> FileResponse:
         return FileResponse(str(index_file), media_type="text/html")
 

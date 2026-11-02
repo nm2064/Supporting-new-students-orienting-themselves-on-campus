@@ -134,8 +134,8 @@
     <script type="text/babel">
         const { useEffect, useMemo, useState, useContext, createContext, useRef } = React;
         const { createRoot } = ReactDOM;
-        const { MemoryRouter, Routes, Route, Link, useNavigate } = ReactRouterDOM;
-        const API_BASE = "http://localhost:8000";
+        const { BrowserRouter, Routes, Route, Link, useNavigate } = ReactRouterDOM;
+        const API_BASE = window.location.origin;
 
         const STORAGE_UI_LANG = "uniAssistant_ui_language";
         const STORAGE_AUTO_DETECT = "uniAssistant_auto_detect_enabled";
@@ -567,7 +567,7 @@
                 setMessages((prev) => [...prev, { role: "user", text: userText }]);
 
                 try {
-                    const res = await fetch("http://localhost:8000/rag-chat", {
+                    const res = await fetch(`${API_BASE}/rag-chat`, {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify({
@@ -577,7 +577,14 @@
                             auto_detect: autoDetectEnabled
                         }),
                     });
-                    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                    if (!res.ok) {
+                        const message = res.status === 503
+                            ? "The AI assistant is being configured. Please check back soon."
+                            : res.status === 429
+                                ? "The demo has reached its request limit. Please try again later."
+                                : "Could not get a response. Please try again.";
+                        throw new Error(message);
+                    }
 
                     const data = await res.json();
                     const answer = typeof data.answer_markdown === "string" && data.answer_markdown.trim()
@@ -605,13 +612,21 @@
                         setSessionDetectedLanguage(data.effective_language);
                     }
                 } catch (err) {
-                    setMessages((prev) => [...prev, { role: "assistant", text: "Error contacting backend. Please try again." }]);
+                    setMessages((prev) => [...prev, { role: "assistant", text: err.message || "Could not connect. Please try again." }]);
                 } finally {
                     setLoading(false);
                 }
             };
 
-            const clearChat = () => {
+            const clearChat = async () => {
+                if (loading) return;
+                try {
+                    const response = await fetch(`${API_BASE}/reset-chat`, {method: "POST"});
+                    if (!response.ok && response.status !== 404) throw new Error("Reset failed");
+                } catch (error) {
+                    setMessages(prev => [...prev, {role: "assistant", text: "Could not clear the conversation. Please try again."}]);
+                    return;
+                }
                 const initial = [{ role: "assistant", text: t.assistantIntro }];
                 setMessages(initial);
                 setFollowUps([]);
@@ -629,8 +644,9 @@
                             <div>
                                 <h2 className="font-bold">UniBot</h2>
                                 <p className="text-xs text-gray-500">
-                                    {lastEffectiveLanguage ? `effective_language=${lastEffectiveLanguage}` : "effective_language=n/a"}
-                                    {lastConfidence !== null ? ` • confidence=${Math.round(lastConfidence * 100)}%` : ""}
+                                    {lastEffectiveLanguage
+                                        ? `Reply language: ${{en: "English", "zh-Hans": "简体中文", hi: "हिन्दी", ar: "العربية"}[lastEffectiveLanguage] || lastEffectiveLanguage}`
+                                        : "Heriot-Watt campus assistant"}
                                 </p>
                             </div>
                             <button onClick={clearChat} className="px-3 py-1.5 text-sm bg-gray-100 dark:bg-gray-800 rounded-lg">{t.clear}</button>
@@ -642,7 +658,12 @@
                                 return (
                                     <div key={idx} className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
                                         <div className={`max-w-[85%] rounded-2xl px-4 py-3 ${isUser ? "bg-primary text-white" : "bg-gray-100 dark:bg-gray-800"}`}>
-                                            <div className="whitespace-pre-wrap text-sm leading-relaxed">{msg.text}</div>
+                                            <div className="whitespace-pre-wrap text-sm leading-relaxed">
+                                                {isUser ? msg.text : msg.text.split(/(\*\*[^*]+\*\*)/g).map((part, partIndex) =>
+                                                    part.startsWith("**") && part.endsWith("**")
+                                                        ? <strong key={partIndex}>{part.slice(2, -2)}</strong>
+                                                        : part)}
+                                            </div>
                                             {msg.citations && msg.citations.length > 0 && (
                                                 <div className="mt-2 border-t border-gray-300/40 pt-2">
                                                     <button onClick={() => setExpandedCitations((prev) => ({ ...prev, [idx]: !prev[idx] }))} className="text-xs text-primary">
@@ -652,8 +673,9 @@
                                                         <div className="mt-2 space-y-2">
                                                             {msg.citations.map((c, cIdx) => (
                                                                 <div key={cIdx} className="text-xs bg-white/60 dark:bg-black/20 rounded-md p-2">
-                                                                    <div>{c.chunk_id || c.source || `source_${cIdx + 1}`}</div>
-                                                                    <div className="text-gray-500">{c.source_url || c.source || ""}</div>
+                                                                    {/^https?:\/\//i.test(c.source_url || c.source || "")
+                                                                        ? <a href={c.source_url || c.source} target="_blank" rel="noopener noreferrer" className="text-primary underline">View source {cIdx + 1}</a>
+                                                                        : <span>Source unavailable</span>}
                                                                 </div>
                                                             ))}
                                                         </div>
@@ -753,11 +775,11 @@
                     preferCanvas: true,   /* faster rendering */
                 }).setView([55.90985, -3.32015], 16);
 
-                window.L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png", {
+                window.L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
                     maxZoom: 19,
-                    keepBuffer: 2,          /* balance memory vs preload */
-                    updateWhenIdle: false,   /* update while panning */
-                    attribution: "&copy; <a href=\"https://www.openstreetmap.org/copyright\">OSM</a> &copy; <a href=\"https://carto.com/\">CARTO</a>"
+                    keepBuffer: 1,
+                    updateWhenIdle: true,
+                    attribution: "&copy; <a href=\"https://www.openstreetmap.org/copyright\">OpenStreetMap</a> contributors"
                 }).addTo(map);
 
                 /* Re-add zoom in a better position */
@@ -1436,9 +1458,9 @@
 
         const root = createRoot(document.getElementById("root"));
         root.render(
-            <MemoryRouter>
+            <BrowserRouter>
                 <App />
-            </MemoryRouter>
+            </BrowserRouter>
         );
     </script>
 </body>

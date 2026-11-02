@@ -19,7 +19,7 @@ class IngestResponse(BaseModel):
 
 
 class ChatRequest(BaseModel):
-    message: str | None = Field(default=None, description="User message")
+    message: str | None = Field(default=None, max_length=4000, description="User message")
     conversation_id: str | None = Field(default=None, description="Conversation ID")
     ui_language: str = Field(default="en", description="Requested UI language")
     auto_detect: bool = Field(default=True, description="Enable language auto-detection")
@@ -29,7 +29,7 @@ class ChatRequest(BaseModel):
         description="Optional location or category context",
     )
 
-    question: str | None = Field(default=None, description="Legacy: user question")
+    question: str | None = Field(default=None, max_length=4000, description="Legacy: user question")
     session_id: str | None = Field(default=None, description="Legacy: session ID")
 
 

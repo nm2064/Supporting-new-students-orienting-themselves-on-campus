@@ -1,0 +1,29 @@
+[Unit]
+Description=UniBot campus assistant
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=unibot
+Group=unibot
+WorkingDirectory=/opt/unibot/app
+EnvironmentFile=/etc/unibot.env
+Environment=PYTHONUNBUFFERED=1
+Environment=ANONYMIZED_TELEMETRY=False
+Environment=OMP_NUM_THREADS=1
+Environment=OPENBLAS_NUM_THREADS=1
+ExecStart=/opt/unibot/venv/bin/uvicorn agentic_rag.app:app --host 127.0.0.1 --port 8001 --workers 1 --proxy-headers --forwarded-allow-ips=127.0.0.1
+Restart=on-failure
+RestartSec=10
+MemoryHigh=350M
+MemoryMax=500M
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/unibot
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

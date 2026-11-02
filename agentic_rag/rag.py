@@ -142,13 +142,23 @@ class OpenAIBackend:
 
             self.settings.validate_required()
             if self.settings.use_azure_openai and self.settings.azure_openai_endpoint:
-                from openai import AzureOpenAI
-
-                self._client = AzureOpenAI(
-                    api_key=self.settings.effective_openai_api_key,
-                    api_version=self.settings.azure_openai_api_version,
-                    azure_endpoint=self.settings.azure_openai_endpoint,
-                )
+                if self._azure_v1():
+                    from openai import OpenAI
+                    self._client = OpenAI(
+                        api_key=self.settings.effective_openai_api_key,
+                        base_url=self.settings.azure_openai_endpoint.rstrip("/") + "/",
+                        timeout=45.0,
+                        max_retries=1,
+                    )
+                else:
+                    from openai import AzureOpenAI
+                    self._client = AzureOpenAI(
+                        api_key=self.settings.effective_openai_api_key,
+                        api_version=self.settings.azure_openai_api_version,
+                        azure_endpoint=self.settings.azure_openai_endpoint,
+                        timeout=45.0,
+                        max_retries=1,
+                    )
                 log_event(
                     logger,
                     "openai_client_initialized",
@@ -162,6 +172,32 @@ class OpenAIBackend:
                 log_event(logger, "openai_client_initialized", provider="openai")
 
         return self._client
+
+    def _azure_v1(self) -> bool:
+        return self.settings.use_azure_openai and self.settings.azure_openai_endpoint.rstrip("/").endswith("/openai/v1")
+
+    def _use_responses(self, model: str) -> bool:
+        return self._azure_v1() or model.lower().startswith("gpt-6")
+
+    def _response_text(self, system_prompt: str, user_prompt: str, model: str, max_tokens: int, json_mode: bool = False) -> str:
+        params: dict[str, Any] = {
+            "model": model,
+            "input": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+            "max_output_tokens": max_tokens,
+            "store": False,
+        }
+        if model.lower().startswith("gpt-6-luna"):
+            params["reasoning"] = {"effort": "none"}
+        if json_mode:
+            params["text"] = {"format": {"type": "json_object"}}
+        response = self._get_client().responses.create(**params)
+        text = (response.output_text or "").strip()
+        if getattr(response, "status", "completed") != "completed" or not text:
+            raise RuntimeError("Model response did not complete with usable text")
+        return text
 
     def _chat_model_name(self, fallback_model: str) -> str:
         if self.settings.use_azure_openai and self.settings.azure_openai_chat_deployment:
@@ -179,7 +215,7 @@ class OpenAIBackend:
 
     @staticmethod
     def _supports_custom_temperature(model_name: str) -> bool:
-        return "gpt-5" not in model_name.lower()
+        return not model_name.lower().startswith(("gpt-5", "gpt-6", "o1", "o3", "o4"))
 
     def embed_texts(self, texts: list[str]) -> list[list[float]]:
         response = self._get_client().embeddings.create(
@@ -190,6 +226,12 @@ class OpenAIBackend:
 
     def chat_json(self, system_prompt: str, user_prompt: str, model: str) -> dict[str, Any]:
         chat_model = self._chat_model_name(model)
+        if self._use_responses(chat_model):
+            content = self._response_text(system_prompt, user_prompt, chat_model, self.settings.chat_max_tokens, json_mode=True)
+            parsed = json.loads(content)
+            if not isinstance(parsed, dict):
+                raise ValueError("Expected a JSON object from the model")
+            return parsed
         params: dict[str, Any] = {
             "model": chat_model,
             "response_format": {"type": "json_object"},
@@ -218,6 +260,8 @@ class OpenAIBackend:
         max_tokens: int,
     ) -> str:
         chat_model = self._chat_model_name(model)
+        if self._use_responses(chat_model):
+            return self._response_text(system_prompt, user_prompt, chat_model, max_tokens)
         params: dict[str, Any] = {
             "model": chat_model,
             "messages": [
@@ -238,7 +282,7 @@ class OpenAIBackend:
     @staticmethod
     def _uses_completion_token_limit(model_name: str) -> bool:
         normalized = model_name.lower()
-        return normalized.startswith(("gpt-5", "o1", "o3", "o4"))
+        return normalized.startswith(("gpt-5", "gpt-6", "o1", "o3", "o4"))
 
 
 class DocumentProcessor:
@@ -469,7 +513,6 @@ class VectorStore:
         campus: str | None = None,
         category: str | None = None,
     ) -> list[RetrievedChunk]:
-        _ = campus
         _ = category
 
         if self.collection is None:
@@ -477,10 +520,13 @@ class VectorStore:
         if self.collection is None:
             return []
 
+        count = self.collection.count()
+        if count == 0:
+            return []
         query_embedding = self.backend.embed_texts([query])[0]
         results = self.collection.query(
             query_embeddings=[query_embedding],
-            n_results=top_k,
+            n_results=min(count, top_k * 3),
             include=["documents", "metadatas", "distances"],
         )
 
@@ -492,11 +538,17 @@ class VectorStore:
             return retrieved
 
         for document, metadata, distance in zip(documents[0], metadatas[0], distances[0]):
+            source = metadata.get("source", "knowledge.txt")
+            requested_campus = (campus or "").lower().replace(" ", "-")
+            source_campus = next((name for name in ("edinburgh", "dubai", "malaysia", "orkney", "scottish-borders")
+                                  if f"/campuses/{name}/" in source or f"/{name}-campus/" in source), None)
+            if requested_campus and source_campus and source_campus != requested_campus:
+                continue
             retrieved.append(
                 RetrievedChunk(
                     chunk=Chunk(
                         text=document,
-                        source=metadata.get("source", "knowledge.txt"),
+                        source=source,
                         chunk_id=metadata.get("chunk_id", "unknown_chunk"),
                         start_pos=metadata.get("start_pos", 0),
                         end_pos=metadata.get("end_pos", 0),
@@ -505,7 +557,7 @@ class VectorStore:
                 )
             )
 
-        return retrieved
+        return retrieved[:top_k]
 
 
 @dataclass
@@ -985,6 +1037,11 @@ class AgenticRAG:
         conversation_id = session_id or str(uuid.uuid4())
         history = self.session_store.history_for(conversation_id)
         effective_campus = _normalize_campus(campus)
+        if not campus:
+            mentioned = [name for name in ("Edinburgh", "Dubai", "Malaysia", "Orkney", "Scottish Borders")
+                         if re.search(r"\b"+re.escape(name)+r"\b", query, re.IGNORECASE)]
+            if len(mentioned) == 1:
+                effective_campus = mentioned[0]
 
         normalized_ui_language = _normalize_ui_language(ui_language)
         detected_language = normalized_ui_language
@@ -1083,7 +1140,7 @@ class AgenticRAG:
                 if chunk.score >= self.settings.similarity_threshold
             ]
             if not relevant_chunks:
-                relevant_chunks = retrieved[:3]
+                relevant_chunks = retrieved[: self.settings.top_k]
             answer_payload = self._grounded_answer_en(
                 query_en,
                 relevant_chunks,
