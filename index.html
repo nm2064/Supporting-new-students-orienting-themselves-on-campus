@@ -120,6 +120,92 @@
         }
 
         @keyframes spin { to { transform: rotate(360deg); } }
+
+        :root { --page: #f7f8fc; --ink: #17233d; --muted: #53627b; --surface: #fff; --line: #e0e6ef; }
+        html.dark { --page: #101622; --ink: #f2f5fc; --muted: #b3c0d4; --surface: #1b2538; --line: #34415a; }
+        body { background: var(--page); color: var(--ink); }
+        a,button,summary { -webkit-tap-highlight-color: transparent; }
+        button,select,summary { min-height: 44px; }
+        ::selection { background: #c9dcff; color: #17233d; }
+        .discovery-main { max-width: 1120px; margin: auto; padding: 32px 24px; }
+        .campus-hero { display:grid; grid-template-columns: 1fr 1fr; background:var(--surface); border-radius:24px; overflow:hidden; min-height:380px; }
+        .hero-copy { padding:40px; align-self:center; }
+        .campus-badge { display:inline-flex; align-items:center; gap:6px; text-transform:capitalize; font-size:13px; color:#2454a4; background:#e9f0ff; padding:6px 12px; border-radius:24px; }
+        .campus-badge .material-symbols-outlined { font-size:16px; }
+        .hero-copy h2 { font-size:clamp(30px,4vw,46px); font-weight:800; line-height:1.13; letter-spacing:-.035em; margin:20px 0 16px; }
+        .hero-copy p { color:var(--muted); font-size:16px; line-height:1.7; }
+        .primary-action { display:inline-flex; align-items:center; gap:12px; padding:14px 20px; background:#135bec; color:white; border-radius:12px; margin:24px 0 16px; font-weight:600; }
+        .hero-copy .hero-note { font-size:12px; }
+        .hero-photo { position:relative; min-height:300px; }
+        .hero-photo img { width:100%; height:100%; object-fit:cover; position:absolute; }
+        .photo-caption { position:absolute; bottom:20px; left:20px; padding:8px 12px; background:#fff; color:#17233d; border-radius:8px; font-size:12px; }
+        .section-heading { display:flex; justify-content:space-between; align-items:baseline; gap:16px; margin:36px 0 18px; }
+        .section-heading h2 { font-size:23px; font-weight:700; letter-spacing:-.025em; }
+        .section-heading p { font-size:14px; color:var(--muted); }
+        .explore-grid { display:grid; grid-template-columns:1.2fr 1fr 1fr; gap:18px; }
+        .explore-card { background:var(--surface); border-radius:16px; overflow:hidden; transition:transform .2s,box-shadow .2s; }
+        .explore-card:hover { transform:translateY(-3px); box-shadow:0 12px 28px #12275212; }
+        .explore-copy { padding:22px; }
+        .explore-copy h3 { font-size:19px; font-weight:700; }
+        .explore-copy p { color:var(--muted); font-size:14px; line-height:1.65; margin:10px 0 18px; }
+        .explore-copy>span { color:#135bec; font-size:13px; font-weight:600; }
+        .map-art { height:150px; background:#dfebe6; background-image:linear-gradient(34deg,transparent 43%,#fff 44%,#fff 49%,transparent 50%),linear-gradient(110deg,transparent 50%,#fff 51%,#fff 58%,transparent 59%); display:flex; align-items:center; justify-content:center; gap:5px; color:#135bec; }
+        .map-art>.material-symbols-outlined { font-size:48px; font-variation-settings:'FILL' 1; }
+        .map-art-label { background:white; padding:8px; border-radius:8px; font-size:12px; }
+        .card-symbol { display:flex; height:150px; align-items:center; justify-content:center; background:#ede8fa; color:#65529a; font-size:62px; }
+        .events-explore>img { width:100%; height:150px; object-fit:cover; }
+        .discovery-footer { display:flex; flex-wrap:wrap; justify-content:space-between; gap:16px; margin:28px 0 12px; font-size:11px; color:var(--muted); }
+        .discovery-footer details { max-width:480px; }
+        .discovery-footer summary { cursor:pointer; }
+        @media(max-width:640px) {
+            .discovery-main { padding:18px 16px 32px; }
+            .campus-hero { grid-template-columns:1fr; border-radius:18px; }
+            .hero-copy { padding:26px 24px; }
+            .hero-photo { min-height:210px; grid-row:1; }
+            .hero-copy h2 { margin-top:16px; }
+            .section-heading { display:block; margin-top:28px; }
+            .section-heading p { margin-top:6px; }
+            .explore-grid { grid-template-columns:1fr; gap:14px; }
+            .explore-card { display:grid; grid-template-columns:112px 1fr; }
+            .map-art,.card-symbol,.events-explore>img { height:100%; min-height:170px; }
+            .map-art { flex-direction:column; }
+            .explore-copy { padding:18px; }
+            header>div { flex-wrap:wrap; gap:8px; }
+            nav { padding-bottom:max(6px,env(safe-area-inset-bottom)) !important; }
+        }
+        .map-body { min-height:0; }
+        @media(max-width:640px) {
+            .map-body { flex-direction:column; }
+            .map-panel { width:100%; max-height:38dvh; flex-shrink:0; border-right:0; box-shadow:none; border-bottom:1px solid #e0e6ef; }
+            .map-canvas { width:100%; min-height:240px; flex:1; }
+            .map-root { padding-bottom:calc(58px + env(safe-area-inset-bottom)); }
+        }
+        .resource-banner { display:flex; justify-content:space-between; align-items:center; gap:24px; background:var(--surface); border-radius:20px; overflow:hidden; }
+        .resource-banner>div { padding:28px; }
+        .resource-banner h2 { margin-top:12px; line-height:1.2; }
+        .resource-banner img { width:40%; height:210px; object-fit:cover; }
+        .resource-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px; margin-top:28px; }
+        .resource-card { background:var(--surface); border-radius:16px; padding:24px; min-width:0; }
+        .event-card { display:flex; gap:18px; }
+        .event-date { flex-shrink:0; width:62px; height:94px; border-radius:12px; background:#eaf0ff; color:#244f9e; display:flex; flex-direction:column; align-items:center; justify-content:center; font-size:12px; }
+        .event-date strong { font-size:30px; line-height:1.2; }
+        .resource-content { min-width:0; }
+        .resource-content h3 { font-size:17px; line-height:1.45; font-weight:700; overflow-wrap:anywhere; }
+        .event-time,.event-venue { display:flex; gap:6px; align-items:flex-start; color:var(--muted); font-size:12px; line-height:1.7; margin-top:12px; }
+        .event-time .material-symbols-outlined,.event-venue .material-symbols-outlined { font-size:17px; flex-shrink:0; margin-top:2px; }
+        .resource-actions { display:flex; flex-wrap:wrap; gap:12px; margin-top:18px; align-items:center; font-size:12px; }
+        .resource-actions>a:first-child { background:#135bec; color:white; padding:10px 14px; border-radius:9px; }
+        .resource-actions>a:last-child,.service-action { color:#135bec; text-decoration:underline; text-underline-offset:3px; }
+        .service-icon { width:52px; height:52px; border-radius:14px; display:grid; place-items:center; margin-bottom:20px; background:#e5efff; color:#2454a4; }
+        .tone-1 { background:#ede8fa; color:#65529a; }.tone-2 { background:#e2f0e9; color:#286c50; }
+        .service-preview { color:var(--muted); font-size:13px; line-height:1.7; margin:12px 0; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
+        .service-card details { font-size:13px; color:var(--muted); margin:12px 0; }.service-card summary { cursor:pointer; }.service-card details p { line-height:1.7; }
+        .service-action { display:inline-flex; align-items:center; min-height:44px; font-size:13px; gap:8px; }
+        @media(max-width:640px) { .resource-grid { grid-template-columns:1fr; gap:14px; }.resource-banner>div { padding:22px; }.resource-banner img { width:30%; height:190px; }.resource-card { padding:20px; }.event-card { gap:14px; } }
+        .chat-starters { display:grid; grid-template-columns:1fr 1fr; gap:10px; padding:8px 0; }
+        .chat-starters button { display:flex; flex-direction:column; align-items:flex-start; gap:12px; text-align:start; border:1px solid var(--line); background:var(--surface); color:var(--ink); border-radius:14px; padding:16px; font-size:12px; line-height:1.5; }
+        .chat-starters .material-symbols-outlined { color:#135bec; background:#eaf0ff; border-radius:10px; padding:8px; }
+        .chat-starters button:hover { border-color:#135bec; }
     </style>
 </head>
 <body class="bg-background-light dark:bg-background-dark text-[#111318] dark:text-white">
@@ -474,10 +560,10 @@
             const {uiLanguage, setLanguage, autoDetectEnabled, toggleAutoDetect} = useLanguage();
             return <details className="text-sm"><summary className="cursor-pointer py-2">Settings</summary>
                 <div className="flex flex-wrap gap-3 py-3">
-                    <label>Campus <select value={campus} onChange={e => setCampus(e.target.value)} className="text-black rounded-lg">
+                    <label>Campus <select aria-label="Campus" value={campus} onChange={e => setCampus(e.target.value)} className="text-black rounded-lg">
                         {["edinburgh", "scottish-borders", "orkney", "dubai", "malaysia"].map(c => <option key={c} value={c}>{c.replaceAll("-", " ")}</option>)}
                     </select></label>
-                    <label>Language <select value={uiLanguage} onChange={e => setLanguage(e.target.value)} className="text-black rounded-lg">
+                    <label>Language <select aria-label="Language" value={uiLanguage} onChange={e => setLanguage(e.target.value)} className="text-black rounded-lg">
                         {LANG_OPTIONS.map(l => <option key={l.id} value={l.id}>{l.label || l.name || l.id}</option>)}
                     </select></label>
                     <label><input type="checkbox" checked={autoDetectEnabled} onChange={toggleAutoDetect}/> Detect reply language</label>
@@ -506,37 +592,28 @@
             );
         };
 
+        const CampusPhoto = ({campus, className = "", decorative = false}) => <img className={className} src={`/images/campus/${campus}.webp`} alt={decorative ? "" : campus === "orkney" ? "Skara Brae in Orkney" : `${campus.replaceAll("-", " ").replace(/^./, c => c.toUpperCase())} campus`} loading="lazy" width="1280" height="720"/>;
         const HomePage = () => {
             const t = useT();
-            return (
-                <div className="min-h-screen pb-24">
-                    <Header />
-                    <main className="max-w-[960px] mx-auto px-4 py-8">
-                        <h2 className="text-3xl font-black">{t.homeTitle}</h2>
-                        <p className="text-gray-500 mt-2">{t.homeSubtitle}</p>
-                        <details className="mt-5 text-sm max-w-prose"><summary>How your conversation is used</summary><p className="mt-2">Your messages are sent to our server and AI provider to prepare replies, and may be sent to a translation service. Conversations are held in server memory and expire after 30 minutes without activity, or earlier when capacity is reached. Reloading starts a new conversation. Avoid sharing sensitive personal information. Provider retention policies also apply.</p></details>
-                        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-8">
-                            <Link to="/chat" className="p-5 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
-                                <span className="material-symbols-outlined text-primary">forum</span>
-                                <p className="font-bold mt-2">{t.navChat}</p>
-                            </Link>
-                            <Link to="/map" className="p-5 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
-                                <span className="material-symbols-outlined text-primary">map</span>
-                                <p className="font-bold mt-2">{t.navMap}</p>
-                            </Link>
-                            <Link to="/services" className="p-5 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
-                                <span className="material-symbols-outlined text-primary">grid_view</span>
-                                <p className="font-bold mt-2">{t.navServices}</p>
-                            </Link>
-                            <Link to="/events" className="p-5 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
-                                <span className="material-symbols-outlined text-primary">event</span>
-                                <p className="font-bold mt-2">{t.navEvents}</p>
-                            </Link>
+            const {campus} = usePreferences();
+            return <div className="discovery-page min-h-screen pb-24"><Header/>
+                <main className="discovery-main">
+                    <section className="campus-hero">
+                        <div className="hero-copy"><span className="campus-badge"><span className="material-symbols-outlined">location_on</span>{campus.replaceAll("-", " ")}</span>
+                            <h2>{t.homeTitle}</h2><p>{t.homeSubtitle}</p>
+                            <Link to="/chat" className="primary-action"><span className="material-symbols-outlined">auto_awesome</span>{t.navChat}<span aria-hidden="true">↗</span></Link>
+                            <p className="hero-note">Your campus. Your language. A little help settling in.</p>
                         </div>
-                    </main>
-                    <BottomNav active="home" />
-                </div>
-            );
+                        <div className="hero-photo"><CampusPhoto campus={campus}/><span className="photo-caption">{campus === "orkney" ? "Discover Orkney" : "A place to make your own"}</span></div>
+                    </section>
+                    <div className="section-heading"><h2>Make yourself at home</h2><p>Find your next step.</p></div>
+                    <section className="explore-grid" aria-label="Explore UniBot">
+                        <Link to="/map" className="explore-card map-explore"><div className="map-art" aria-hidden="true"><span className="material-symbols-outlined">location_on</span><span className="map-art-label">You are here</span></div><div className="explore-copy"><h3>Explore campus</h3><p>Find a building. Plan your route. Feel your way around.</p><span>{t.navMap} ↗</span></div></Link>
+                        <Link to="/services" className="explore-card support-explore"><span className="card-symbol material-symbols-outlined" aria-hidden="true">volunteer_activism</span><div className="explore-copy"><h3>{t.navServices}</h3><p>From study support to wellbeing, find the right people.</p><span>Find support ↗</span></div></Link>
+                        <Link to="/events" className="explore-card events-explore"><CampusPhoto campus={campus} decorative/><div className="explore-copy"><h3>{t.navEvents}</h3><p>Meet people and find something to look forward to.</p><span>See what’s on ↗</span></div></Link>
+                    </section>
+                    <footer className="discovery-footer"><span>Campus photography: Heriot-Watt University</span><details><summary>Privacy & your conversation</summary><p>Messages are sent to our server and AI provider, and may be translated by an external service. Server conversations expire after 30 minutes of inactivity. Reloading starts a new conversation. Avoid sharing sensitive personal information. Provider policies also apply.</p></details></footer>
+                </main><BottomNav active="home"/></div>;
         };
 
         const STORAGE_CHAT_MESSAGES = "unibot_chat_messages";
@@ -904,6 +981,12 @@
                                     </div>
                                 );
                             })}
+                            {messages.length === 1 && !loading && <div className="chat-starters" aria-label="Conversation starters">{[
+                                ["local_library", "Library opening hours", "When is the library open?"],
+                                ["explore", "Find my way", "How do I find the main library?"],
+                                ["groups", "Meet people", "What student events are coming up?"],
+                                ["volunteer_activism", "Get support", "Where can I find student support?"]
+                            ].map(([icon,label,question]) => <button key={icon} aria-label={label} onClick={() => setInput(question)}><span className="material-symbols-outlined" aria-hidden="true">{icon}</span><span>{label}</span></button>)}</div>}
                             {loading && preview && <div className="p-3 bg-gray-100 dark:bg-gray-800 rounded-xl"><p className="text-xs mb-2">Draft answer · checking citations</p><p className="whitespace-pre-wrap text-sm">{preview}</p></div>}
                             {loading && <div role="status" className="text-sm text-gray-500">Checking sources and preparing your answer…</div>}
                         </div>
@@ -1611,15 +1694,18 @@
             }, [campus, events, retry]);
             return <div className="min-h-screen pb-24"><Header />
                 <main className="max-w-[960px] mx-auto px-4 py-8">
-                    <h2 className="text-3xl font-black">{events ? t.eventsTitle : t.servicesTitle}</h2>
+                    <section className="resource-banner"><div><span className="campus-badge">{campus.replaceAll("-", " ")}</span><h2 className="text-3xl font-black">{events ? t.eventsTitle : t.servicesTitle}</h2></div><CampusPhoto campus={campus} decorative/></section>
                     <p className="mt-3">Official university information for {campus.replaceAll("-", " ")}. Check the source for the latest details.</p>
                     {status === "loading" && <p role="status" className="py-6">Loading university information…</p>}
                     {status === "error" && <p role="alert" className="py-6">Information could not be loaded. <button className="underline" onClick={() => setRetry(n => n+1)}>Try again</button></p>}
                     {status === "ready" && !items.length && <p className="py-6">No {events ? "upcoming events" : "services"} are listed for this campus. Try another campus in Settings.</p>}
-                    {status === "ready" && <ul className="divide-y divide-gray-300 mt-6">{items.map(item => <li key={item.url} className="py-5">
-                        <h3 className="font-bold text-lg"><a className="underline text-primary" href={item.url} target="_blank" rel="noopener noreferrer">{item.title}</a></h3>
-                        {events ? <React.Fragment><p className="mt-2"><time dateTime={item.start}>{new Date(item.start).toLocaleString()}</time>{item.end && ` – ${new Date(item.end).toLocaleTimeString([], {hour: "2-digit", minute: "2-digit"})}`} (venue local time)</p><p>{item.location}</p><Link className="underline text-sm" to={`/map?q=${encodeURIComponent(item.location || item.title)}`}>Find venue on map</Link></React.Fragment> : <p className="mt-2 max-w-prose">{item.description}</p>}
-                    </li>)}</ul>}
+                    {status === "ready" && <div className="resource-grid">{items.map((item, index) => <article key={item.url} aria-label={item.title} className={`resource-card ${events ? "event-card" : "service-card"}`}>
+                        {events ? <div className="event-date" aria-hidden="true"><span>{new Date(item.start).toLocaleDateString(undefined, {month:"short"})}</span><strong>{new Date(item.start).getDate()}</strong><span>{new Date(item.start).toLocaleDateString(undefined, {weekday:"short"})}</span></div> : <div className={`service-icon tone-${index % 3}`} aria-hidden="true"><span className="material-symbols-outlined">{/wellbeing|health/i.test(item.title) ? "favorite" : /career/i.test(item.title) ? "work" : /accommodation/i.test(item.title) ? "home" : /it |comput/i.test(item.title) ? "devices" : "support_agent"}</span></div>}
+                        <div className="resource-content"><h3>{item.title}</h3>
+                        {events ? <React.Fragment><p className="event-time"><span className="material-symbols-outlined" aria-hidden="true">schedule</span><time dateTime={item.start}>{new Date(item.start).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"})}</time>{item.end && ` – ${new Date(item.end).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"})}`} · venue local time</p><p className="event-venue"><span className="material-symbols-outlined" aria-hidden="true">location_on</span>{item.location}</p>
+                        <div className="resource-actions"><a href={item.url} target="_blank" rel="noopener noreferrer">View event <span aria-hidden="true">↗</span></a><Link to={`/map?q=${encodeURIComponent(item.location || item.title)}`}>Find venue</Link></div></React.Fragment> : <React.Fragment><p className="service-preview">{item.description}</p><details><summary>About this service</summary><p>{item.description}</p></details><a className="service-action" href={item.url} target="_blank" rel="noopener noreferrer">Visit official page <span aria-hidden="true">↗</span></a></React.Fragment>}
+                        </div></article>)}</div>}
+
                 </main><BottomNav active={events ? "events" : "services"}/></div>;
         };
         const ServicesPage = () => <CampusInformationPage />;

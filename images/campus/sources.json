@@ -1,0 +1,37 @@
+[
+  {
+    "campus": "edinburgh",
+    "page": "https://www.hw.ac.uk/campuses/edinburgh",
+    "image": "https://www.hw.ac.uk/image-library/bi-edinburgh-campus.x6770e3b7.jpg?w=1920&h=672&fit=crop&q=75&f=webp",
+    "description": "The GRID building stands behind a serene Loch, reflecting its structure in the calm water.",
+    "credit": "Heriot-Watt University"
+  },
+  {
+    "campus": "scottish-borders",
+    "page": "https://www.hw.ac.uk/campuses/scottish-borders",
+    "image": "https://www.hw.ac.uk/image-library/students/new-students/HWU-4448-bortders-high-mill.x66e0020c.jpg?w=1920&h=672&fit=crop&q=75&f=webp",
+    "description": "The High Mill building at the Scottish Borders Campus",
+    "credit": "Heriot-Watt University"
+  },
+  {
+    "campus": "orkney",
+    "page": "https://www.hw.ac.uk/campuses/orkney",
+    "image": "https://www.hw.ac.uk/image-library/orkney-ruins-skara-brae.x79d00a10.png?w=1920&h=672&fit=crop&q=75&f=webp",
+    "description": "Skara Brae, the remains of a stone-built Neolithic settlement on Orkney.",
+    "credit": "Heriot-Watt University"
+  },
+  {
+    "campus": "dubai",
+    "page": "https://www.hw.ac.uk/dubai",
+    "image": "https://www.hw.ac.uk/image-library/events/website-banner1.x524f7b88.png?w=1280&h=474&fit=crop&q=75&f=webp",
+    "description": "students walking infront of HWU shield in yellow",
+    "credit": "Heriot-Watt University"
+  },
+  {
+    "campus": "malaysia",
+    "page": "https://www.hw.ac.uk/malaysia",
+    "image": "https://www.hw.ac.uk/image-library/news-articles/malaysia.x4734dc90.jpg?w=1280&h=474&fit=crop&q=75&f=webp",
+    "description": "Aerial view of Heriot-Watt Malaysia campus",
+    "credit": "Heriot-Watt University"
+  }
+]
