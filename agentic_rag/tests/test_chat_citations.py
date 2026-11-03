@@ -436,3 +436,12 @@ def test_source_title_localization_preserves_links_in_every_language(knowledge_s
     assert result.citations[0]['title'] == title
     assert result.citations[0]['url'] == OPENING_HOURS_URL
     assert result.citations[0]['number'] == 1
+
+
+@pytest.mark.parametrize('language,expected', [('zh-Hans','学习共享空间'),('hi','साझा अध्ययन स्थल'),('ar','مساحات التعلم المشتركة')])
+def test_known_facility_names_are_localized_even_when_model_preserves_the_english_name(knowledge_settings, language, expected):
+    rag=build_rag(knowledge_settings,FakeKnowledgeLLM('Learning Commons {cite:open 24 hours}.'),translator=FakeTranslator())
+    response=rag.chat('What are the library opening hours?',ui_language=language,auto_detect=False)
+    assert expected in response.answer_markdown
+    assert 'Learning Commons' not in response.answer_markdown
+    assert response.citations[0]['url'] == OPENING_HOURS_URL

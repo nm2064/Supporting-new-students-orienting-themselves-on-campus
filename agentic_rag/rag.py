@@ -1213,6 +1213,28 @@ class AgenticRAG:
             except Exception as error:
                 logger.warning("Language repair unavailable (%s)", type(error).__name__)
 
+        # Stable translations for common campus names must not depend on whether
+        # a model interprets the English name as a proper noun. Leave URLs intact.
+        campus_terms = {
+            "zh-Hans": {"Learning Commons": "学习共享空间", "Edinburgh Campus": "爱丁堡校区", "Hugh Nisbet": "休·尼斯贝特", "Cameron Smail": "卡梅伦·斯梅尔"},
+            "hi": {"Learning Commons": "साझा अध्ययन स्थल", "Edinburgh Campus": "एडिनबरा परिसर", "Hugh Nisbet": "ह्यू निस्बेट", "Cameron Smail": "कैमरन स्मेल"},
+            "ar": {"Learning Commons": "مساحات التعلم المشتركة", "Edinburgh Campus": "حرم إدنبرة", "Hugh Nisbet": "هيو نيسبت", "Cameron Smail": "كاميرون سمايل"},
+        }.get(effective_language, {})
+        def localize_campus_terms(text: str) -> str:
+            parts = re.split(r"(https?://[^\s<>)]+|`[^`]*`)", text)
+            for index, part in enumerate(parts):
+                if part.startswith(("http://", "https://", "`")):
+                    continue
+                for name, translated in campus_terms.items():
+                    part = re.sub(r"\b" + re.escape(name) + r"\b", translated, part, flags=re.IGNORECASE)
+                parts[index] = part
+            return "".join(parts)
+        if campus_terms:
+            answer_markdown = localize_campus_terms(answer_markdown)
+            follow_ups = [localize_campus_terms(str(item)) for item in follow_ups]
+            for citation in citations:
+                citation["title"] = localize_campus_terms(citation["title"])
+
         log_event(
             logger,
             "rag_summary",
