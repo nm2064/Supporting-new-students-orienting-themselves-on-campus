@@ -206,6 +206,27 @@
         .chat-starters button { display:flex; flex-direction:column; align-items:flex-start; gap:12px; text-align:start; border:1px solid var(--line); background:var(--surface); color:var(--ink); border-radius:14px; padding:16px; font-size:12px; line-height:1.5; }
         .chat-starters .material-symbols-outlined { color:#135bec; background:#eaf0ff; border-radius:10px; padding:8px; }
         .chat-starters button:hover { border-color:#135bec; }
+        .settings-trigger { display:inline-flex; align-items:center; justify-content:center; gap:7px; flex-shrink:0; border:1px solid var(--line); background:var(--surface); color:var(--ink); border-radius:12px; padding:0 12px; font-size:13px; font-weight:600; }
+        .settings-trigger:hover,.settings-trigger[aria-expanded="true"] { background:#eaf0ff; color:#2454a4; border-color:#b7cdf5; }
+        .settings-trigger .material-symbols-outlined { font-size:20px; }
+        .settings-panel { position:fixed; inset:auto; inset-block-start:76px; inset-inline-end:16px; margin:0; width:360px; max-width:calc(100vw - 24px); max-height:calc(100dvh - 100px); overflow:auto; padding:0; border:1px solid var(--line); border-radius:18px; background:var(--surface); color:var(--ink); box-shadow:0 18px 60px #12275226; font-family:inherit; text-align:start; }
+        .settings-heading { display:flex; justify-content:space-between; align-items:flex-start; gap:12px; padding:22px 22px 18px; border-bottom:1px solid var(--line); }
+        .settings-heading h2 { font-size:20px; line-height:1.3; font-weight:700; letter-spacing:-.02em; }
+        .settings-heading p { color:var(--muted); font-size:13px; margin-top:6px; }
+        .settings-close { display:grid; place-items:center; width:44px; flex-shrink:0; border-radius:10px; background:var(--page); color:var(--muted); }
+        .settings-fields { padding:20px 22px; display:grid; gap:20px; }
+        .settings-field { display:grid; gap:9px; font-size:13px; font-weight:600; }
+        .settings-field>span { display:flex; gap:8px; align-items:center; }
+        .settings-field .material-symbols-outlined { color:#135bec; font-size:19px; }
+        .settings-field select { width:100%; border:1px solid var(--line); background-color:var(--page); color:var(--ink); border-radius:10px; font-size:14px; padding:10px 36px 10px 12px; }
+        .settings-field small,.settings-toggle small { display:block; font-size:12px; line-height:1.55; color:var(--muted); font-weight:400; }
+        .settings-toggle { display:flex; align-items:center; justify-content:space-between; gap:18px; cursor:pointer; min-height:48px; }
+        .settings-toggle strong { display:block; font-size:13px; font-weight:600; margin-bottom:3px; }
+        .settings-toggle input { width:20px; height:20px; accent-color:#135bec; flex-shrink:0; border-radius:5px; }
+        .settings-footer { display:flex; justify-content:space-between; align-items:center; gap:12px; border-top:1px solid var(--line); background:var(--page); padding:14px 22px; }
+        .settings-footer>span { font-size:11px; color:var(--muted); }
+        .settings-footer button { background:#135bec; color:#fff; padding:0 20px; border-radius:10px; font-size:13px; font-weight:600; }
+        @media(max-width:640px) { .settings-panel { inset-block-start:72px; inset-inline-end:12px; }.settings-heading { padding:18px; }.settings-fields { padding:18px; }.settings-footer { padding:12px 18px; } }
     </style>
 </head>
 <body class="bg-background-light dark:bg-background-dark text-[#111318] dark:text-white">
@@ -558,18 +579,52 @@
         const SettingsControls = () => {
             const {campus, setCampus, dark, setDark} = usePreferences();
             const {uiLanguage, setLanguage, autoDetectEnabled, toggleAutoDetect} = useLanguage();
-            return <details className="text-sm"><summary className="cursor-pointer py-2">Settings</summary>
-                <div className="flex flex-wrap gap-3 py-3">
-                    <label>Campus <select aria-label="Campus" value={campus} onChange={e => setCampus(e.target.value)} className="text-black rounded-lg">
-                        {["edinburgh", "scottish-borders", "orkney", "dubai", "malaysia"].map(c => <option key={c} value={c}>{c.replaceAll("-", " ")}</option>)}
-                    </select></label>
-                    <label>Language <select aria-label="Language" value={uiLanguage} onChange={e => setLanguage(e.target.value)} className="text-black rounded-lg">
-                        {LANG_OPTIONS.map(l => <option key={l.id} value={l.id}>{l.label || l.name || l.id}</option>)}
-                    </select></label>
-                    <label><input type="checkbox" checked={autoDetectEnabled} onChange={toggleAutoDetect}/> Detect reply language</label>
-                    <label><input type="checkbox" checked={dark} onChange={e => setDark(e.target.checked)}/> Dark mode</label>
+            const panel = useRef(null);
+            const trigger = useRef(null);
+            const id = React.useId();
+            const [open, setOpen] = useState(false);
+            const positionPanel = () => {
+                const element = panel.current;
+                if (!element.matches(":popover-open")) return;
+                const anchor = trigger.current.getBoundingClientRect();
+                const width = element.getBoundingClientRect().width;
+                const preferred = document.documentElement.dir === "rtl" ? anchor.left : anchor.right - width;
+                element.style.insetInlineEnd = "auto";
+                element.style.left = `${Math.max(12, Math.min(preferred, window.innerWidth - width - 12))}px`;
+                element.style.top = `${anchor.bottom + 8}px`;
+                element.style.maxHeight = `${Math.max(120, window.innerHeight - anchor.bottom - 24)}px`;
+            };
+            useEffect(() => {
+                const element = panel.current;
+                const sync = () => { setOpen(element.matches(":popover-open")); positionPanel(); };
+                element.addEventListener("toggle", sync);
+                window.addEventListener("resize", positionPanel);
+                positionPanel();
+                return () => { element.removeEventListener("toggle", sync); window.removeEventListener("resize", positionPanel); };
+            }, [uiLanguage]);
+            const close = () => { panel.current.hidePopover(); trigger.current.focus(); };
+            return <React.Fragment>
+                <button ref={trigger} className="settings-trigger" aria-label="Settings" aria-haspopup="dialog" aria-expanded={open} aria-controls={id}
+                    onClick={() => { panel.current.togglePopover(); if (panel.current.matches(":popover-open")) { positionPanel(); panel.current.querySelector("button").focus(); } }}>
+                    <span className="material-symbols-outlined" aria-hidden="true">tune</span><span>Settings</span>
+                </button>
+                <div ref={panel} id={id} popover="auto" role="dialog" aria-label="Settings" className="settings-panel">
+                    <div className="settings-heading"><div><h2>Your preferences</h2><p>Make UniBot work for you.</p></div><button onClick={close} aria-label="Close settings" className="settings-close"><span className="material-symbols-outlined" aria-hidden="true">close</span></button></div>
+                    <div className="settings-fields">
+                        <label className="settings-field"><span><span className="material-symbols-outlined" aria-hidden="true">location_on</span>Campus</span>
+                            <select aria-label="Campus" value={campus} onChange={e => setCampus(e.target.value)}>
+                                {[["edinburgh","Edinburgh"],["scottish-borders","Scottish Borders"],["orkney","Orkney"],["dubai","Dubai"],["malaysia","Malaysia"]].map(([value,label]) => <option key={value} value={value}>{label}</option>)}
+                            </select><small>Sets the context for events, services and answers.</small>
+                        </label>
+                        <label className="settings-field"><span><span className="material-symbols-outlined" aria-hidden="true">language</span>Language</span>
+                            <select aria-label="Language" value={uiLanguage} onChange={e => setLanguage(e.target.value)}>{LANG_OPTIONS.map(l => <option key={l.id} value={l.id}>{l.label}</option>)}</select>
+                        </label>
+                        <label className="settings-toggle"><span><strong>Detect reply language</strong><small>Reply in the language you write in.</small></span><input aria-label="Detect reply language" type="checkbox" checked={autoDetectEnabled} onChange={toggleAutoDetect}/></label>
+                        <label className="settings-toggle"><span><strong>Dark mode</strong><small>A darker appearance for low light.</small></span><input aria-label="Dark mode" type="checkbox" checked={dark} onChange={e => setDark(e.target.checked)}/></label>
+                    </div>
+                    <div className="settings-footer"><span>Changes save automatically</span><button onClick={close}>Done</button></div>
                 </div>
-            </details>;
+            </React.Fragment>;
         };
         const Header = ({ title }) => {
             const navigate = useNavigate();
@@ -583,10 +638,7 @@
                             </div>
                             <h1 className="font-bold">{title || t.appName}</h1>
                         </div>
-                        <SettingsControls /><button onClick={() => navigate("/onboarding")} className="px-3 py-2 bg-gray-100 dark:bg-gray-800 rounded-lg text-sm flex items-center gap-1">
-                            <span className="material-symbols-outlined text-base">language</span>
-                            <span>{t.language}</span>
-                        </button>
+                        <SettingsControls />
                     </div>
                 </header>
             );

@@ -34,7 +34,8 @@ def test_home_has_campus_photography_and_clear_mobile_actions(page):
     page.get_by_role('heading', level=2).first.wait_for()
     image = page.get_by_role('img', name='Edinburgh campus')
     assert image.count() == 1
-    assert image.evaluate('(img) => img.complete && img.naturalWidth > 0')
+    image.evaluate('(img) => img.decode()')
+    assert image.evaluate('(img) => img.naturalWidth > 0')
     assert page.get_by_role('link', name='Explore campus').count() == 1
     assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
 
@@ -83,3 +84,42 @@ def test_chat_starter_card_fills_message_without_sending(page):
     page.goto(page.base_url + '/chat')
     page.get_by_role('button', name='Library opening hours', exact=True).click()
     assert page.get_by_role('textbox', name='Message to UniBot').input_value() == 'When is the library open?'
+
+
+@pytest.mark.parametrize('width', [360, 1440])
+def test_settings_opens_without_moving_header_or_content_and_escape_returns_focus(page, width):
+    page.set_viewport_size({'width':width,'height':900})
+    page.goto(page.base_url)
+    page.get_by_role('heading', level=2).first.wait_for()
+    page.evaluate('document.fonts.ready')
+    header_before = page.locator('header').bounding_box()
+    content_before = page.locator('main').bounding_box()
+    page.get_by_text('Settings', exact=True).click()
+    assert page.locator('header').bounding_box() == header_before
+    assert page.locator('main').bounding_box() == content_before
+    panel = page.get_by_role('dialog', name='Settings')
+    panel.wait_for()
+    box = panel.bounding_box()
+    assert box['x'] >= 0 and box['x'] + box['width'] <= width
+    if width > 640:
+        trigger_box = page.get_by_role('button', name='Settings', exact=True).bounding_box()
+        assert abs(box['x'] + box['width'] - trigger_box['x'] - trigger_box['width']) < 2
+    page.keyboard.press('Escape')
+    assert not panel.is_visible()
+    assert page.get_by_role('button', name='Settings', exact=True).evaluate('(el) => el === document.activeElement')
+
+
+def test_settings_done_and_outside_click_dismiss_panel_and_keep_preferences(page):
+    page.goto(page.base_url)
+    page.get_by_role('button', name='Settings', exact=True).click()
+    panel = page.get_by_role('dialog', name='Settings')
+    panel.get_by_label('Campus', exact=True).select_option('dubai')
+    panel.get_by_role('button', name='Done', exact=True).click()
+    assert not panel.is_visible()
+    page.get_by_role('button', name='Settings', exact=True).click()
+    assert panel.get_by_label('Campus', exact=True).input_value() == 'dubai'
+    page.mouse.click(5, 700)
+    assert not panel.is_visible()
+    page.reload()
+    page.get_by_role('button', name='Settings', exact=True).click()
+    assert page.get_by_label('Campus', exact=True).input_value() == 'dubai'
