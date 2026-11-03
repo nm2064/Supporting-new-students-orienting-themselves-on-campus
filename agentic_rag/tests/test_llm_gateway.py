@@ -147,3 +147,24 @@ def test_embedding_gives_up_after_repeated_failures():
 
     with pytest.raises(RuntimeError, match="service inference failed"):
         gateway.embed_texts(["The library is open 24 hours."])
+
+
+def test_nvidia_stream_delivers_answer_during_generation_and_returns_complete_json():
+    from types import SimpleNamespace as NS
+    from agentic_rag.streaming import answer_sink, answer_generation
+    received = []
+    fragments = ['{"answer_markdown":"Open ', '24 hours [1].", "confidence":0.9}']
+    class Completions:
+        def create(self, **kwargs):
+            assert kwargs['stream'] is True
+            return iter([NS(choices=[NS(delta=NS(content=f))]) for f in fragments])
+    gateway = LLMGateway(nvidia_settings(), client=NS(chat=NS(completions=Completions())))
+    token = answer_sink.set(received.append)
+    scope = answer_generation.set(True)
+    try:
+        result = gateway.chat_json('Return JSON.', 'Hours?')
+    finally:
+        answer_generation.reset(scope)
+        answer_sink.reset(token)
+    assert result['answer_markdown'] == 'Open 24 hours [1].'
+    assert received == ['Open ', 'Open 24 hours [1].']

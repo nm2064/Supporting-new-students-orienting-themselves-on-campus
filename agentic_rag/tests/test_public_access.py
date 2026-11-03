@@ -12,6 +12,7 @@ def client(monkeypatch, tmp_path, limit=200):
     app = FastAPI()
     app.add_middleware(PublicAccessMiddleware)
 
+    @app.post("/rag-chat/stream")
     @app.post("/rag-chat")
     async def chat(request: Request):
         return {"session": request.state.public_session}
@@ -79,3 +80,12 @@ def test_starting_a_new_conversation_does_not_use_up_the_ai_request_allowance(mo
         assert c.post('/reset-chat').status_code == 200
     assert c.post('/rag-chat').status_code == 200
     assert c.post('/rag-chat').status_code == 200
+
+
+def test_stream_keeps_signed_session_origin_checks_and_quota(monkeypatch, tmp_path):
+    c = client(monkeypatch, tmp_path, limit=1)
+    assert c.post('/rag-chat/stream', headers={'Origin': 'https://other.test'}).status_code == 403
+    first = c.post('/rag-chat/stream')
+    assert first.status_code == 200
+    assert 'HttpOnly' in first.headers['set-cookie']
+    assert c.post('/rag-chat/stream').status_code == 429

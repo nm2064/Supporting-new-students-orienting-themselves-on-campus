@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from .streaming import streamed_answer
+
 import hashlib
 import json
 import logging
@@ -853,6 +855,7 @@ class AgenticRAG:
             "confidence": max(0.0, min(1.0, confidence)),
         }
 
+    @streamed_answer
     def _grounded_answer(
         self,
         query: str,

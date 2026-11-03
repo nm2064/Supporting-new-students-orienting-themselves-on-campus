@@ -218,6 +218,25 @@ class LLMGateway:
             params["max_tokens"] = budget
             params["temperature"] = 0.1
 
+        from .streaming import answer_sink, answer_generation, partial_answer
+        sink = answer_sink.get()
+        if sink and answer_generation.get():
+            chunks = self._get_client().chat.completions.create(**params, stream=True)
+            content = ""
+            previous = None
+            try:
+                for chunk in chunks:
+                    if not chunk.choices:
+                        continue
+                    content += chunk.choices[0].delta.content or ""
+                    preview = partial_answer(content)
+                    if preview is not None and preview != previous:
+                        sink(preview)
+                        previous = preview
+            finally:
+                if hasattr(chunks, "close"):
+                    chunks.close()
+            return _parse_json_object(content) or {}
         response = self._get_client().chat.completions.create(**params)
         choice = response.choices[0]
         parsed = _parse_json_object(choice.message.content or "")

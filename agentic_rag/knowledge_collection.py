@@ -312,7 +312,12 @@ class KnowledgeCollector:
         if student_events is not None:
             result = self._get(student_events.api_url) if self._allowed(student_events.api_url) else None
             if result and result.status == 200:
-                pages.extend(_student_event_pages(result.text))
+                for page in _student_event_pages(result.text):
+                    event = page["event"]
+                    if not event["start"] or not event["end"] or event["end"] < event["start"]:
+                        unavailable.append({"url": page["url"], "reason": "Invalid event start or end time"})
+                    else:
+                        pages.append(page)
             else:
                 unavailable.append({"url": student_events.api_url, "status": result.status if result else None})
 
@@ -419,8 +424,9 @@ def _student_event_pages(feed_html: str) -> list[dict]:
         start, end = fields.pop("From", ""), fields.pop("To", "")
         if start:
             lines.append(f"When: {start}" + (f" to {end}" if end else ""))
-        if "Location" in fields:
-            lines.append(f"Where: {fields.pop('Location')}")
+        location = fields.pop("Location", "")
+        if location:
+            lines.append(f"Where: {location}")
         lines.extend(f"{label}: {value}" for label, value in fields.items() if value)
         pages.append(
             {
@@ -430,9 +436,48 @@ def _student_event_pages(feed_html: str) -> list[dict]:
                 "site_label": "Heriot-Watt Student Events",
                 "headings": [title],
                 "extracted_text": "\n".join(lines),
+                # Structured copy for the Events page.
+                "event": {
+                    "title": title,
+                    "start": _libcal_time(start),
+                    "end": _libcal_time(end),
+                    "location": location,
+                    "campus": _campus_named_in(" ".join([location, *fields.values()])),
+                    "url": link,
+                },
             }
         )
     return pages
+
+
+_CAMPUSES = {
+    "edinburgh": "edinburgh",
+    "scottish borders": "scottish-borders",
+    "borders": "scottish-borders",
+    "orkney": "orkney",
+    "dubai": "dubai",
+    "malaysia": "malaysia",
+}
+
+
+def _campus_named_in(text: str) -> str | None:
+    lowered = text.lower()
+    for name, campus in _CAMPUSES.items():
+        if name in lowered:
+            return campus
+    return None
+
+
+def _libcal_time(value: str) -> str | None:
+    """'11:00 Wednesday, November 11, 2026' -> '2026-11-11T11:00:00' (campus local time)."""
+    from datetime import datetime
+
+    for pattern in ("%H:%M %A, %B %d, %Y", "%A, %B %d, %Y"):
+        try:
+            return datetime.strptime(value.strip(), pattern).isoformat()
+        except ValueError:
+            continue
+    return None
 
 
 @dataclass(frozen=True)

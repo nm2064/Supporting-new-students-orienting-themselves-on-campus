@@ -120,3 +120,48 @@ async def get_session_history(session_id: str, rag: RagDep) -> dict[str, object]
 async def clear_session(session_id: str, rag: RagDep) -> dict[str, str]:
     rag.clear_session(session_id)
     return {"session_id": session_id, "status": "cleared"}
+
+@router.post('/rag-chat/stream')
+async def rag_chat_stream(request: ChatRequest, rag: RagDep, http_request: Request):
+    import asyncio
+    import json
+    from fastapi.responses import StreamingResponse
+    from .streaming import answer_sink
+
+    # Validate before opening the stream so configuration errors retain HTTP status.
+    try:
+        validate_config()
+    except ConfigurationError as error:
+        _raise_config_error(error)
+    if not (request.message or request.question or '').strip():
+        raise HTTPException(400, 'Message cannot be empty')
+    queue = asyncio.Queue()
+    loop = asyncio.get_running_loop()
+    def preview(text):
+        loop.call_soon_threadsafe(queue.put_nowait, {'type': 'preview', 'text': text})
+    async def work():
+        token = answer_sink.set(preview)
+        try:
+            result = await rag_chat(request, rag, http_request)
+            await queue.put({'type': 'complete', 'response': result.model_dump()})
+        except Exception:
+            await queue.put({'type': 'error', 'message': 'The assistant is temporarily unavailable. Please try again.'})
+        finally:
+            answer_sink.reset(token)
+    async def events():
+        task = asyncio.create_task(work())
+        try:
+            yield 'data: {"type":"status","message":"Checking university sources"}\n\n'
+            while True:
+                try:
+                    event = await asyncio.wait_for(queue.get(), timeout=15)
+                except asyncio.TimeoutError:
+                    yield ': keep-alive\n\n'
+                    continue
+                yield 'data: ' + json.dumps(event, ensure_ascii=True) + '\n\n'
+                if event['type'] in {'complete', 'error'}:
+                    break
+        finally:
+            task.cancel()
+            await asyncio.gather(task, return_exceptions=True)
+    return StreamingResponse(events(), media_type='text/event-stream', headers={'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no'})

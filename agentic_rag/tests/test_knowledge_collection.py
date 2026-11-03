@@ -344,3 +344,40 @@ def test_societies_from_the_union_feed_become_cited_pages_and_a_directory_by_cat
     assert directory["url"] == SOCIETIES_PAGE
     assert "Activity: Hillwalking Club" in directory["extracted_text"]
     assert "Cultural: Chinese Students and Scholars Association" in directory["extracted_text"]
+
+
+def test_student_event_pages_keep_structured_times_and_place_for_the_events_page():
+    feed = _event_table(
+        "Careers fair", "https://hw.ac.libcal.com/event/4700001",
+        "11:00 Wednesday, November 11, 2026", "15:00 Wednesday, November 11, 2026",
+        "James Watt Centre, Edinburgh Campus",
+    )
+    web = FakeWeb({LIBCAL_EVENTS_API: feed})
+
+    corpus = KnowledgeCollector(fetch=web, scope=SCOPE, delay_s=0).collect(
+        student_events=StudentEventsSource(api_url=LIBCAL_EVENTS_API)
+    )
+
+    assert corpus["pages"][0]["event"] == {
+        "title": "Careers fair",
+        "start": "2026-11-11T11:00:00",
+        "end": "2026-11-11T15:00:00",
+        "location": "James Watt Centre, Edinburgh Campus",
+        "campus": "edinburgh",
+        "url": "https://hw.ac.libcal.com/event/4700001",
+    }
+
+
+def test_collector_reports_unparseable_event_dates():
+    web = FakeWeb({LIBCAL_EVENTS_API: _event_table(
+        'Careers fair', 'https://hw.ac.libcal.com/event/4700001',
+        'Date to be confirmed', 'Date to be confirmed', 'Edinburgh Campus',
+    )})
+    corpus = KnowledgeCollector(fetch=web, scope=SCOPE, delay_s=0).collect(
+        student_events=StudentEventsSource(api_url=LIBCAL_EVENTS_API)
+    )
+    assert not corpus['pages']
+    assert corpus['unavailable'] == [{
+        'url': 'https://hw.ac.libcal.com/event/4700001',
+        'reason': 'Invalid event start or end time',
+    }]

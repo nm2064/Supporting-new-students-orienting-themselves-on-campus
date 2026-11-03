@@ -35,6 +35,9 @@
         .hide-scrollbar::-webkit-scrollbar { display: none; }
         .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 
+        :focus-visible { outline: 3px solid #135bec; outline-offset: 3px; }
+        html.dark { color-scheme: dark; background: #101622; color: #f3f4f6; }
+        @media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
         /* Map */
         .map-root { position: fixed; inset: 0; display: flex; flex-direction: column; }
         .map-body { flex: 1; position: relative; display: flex; }
@@ -457,6 +460,31 @@
             );
         };
 
+        const PreferencesContext = React.createContext();
+        const usePreferences = () => useContext(PreferencesContext);
+        const Preferences = ({children}) => {
+            const [campus, setCampus] = useState(() => localStorage.getItem("unibot-campus") || "edinburgh");
+            const [dark, setDark] = useState(() => localStorage.getItem("unibot-dark") === "true");
+            useEffect(() => { localStorage.setItem("unibot-campus", campus); }, [campus]);
+            useEffect(() => { document.documentElement.classList.toggle("dark", dark); localStorage.setItem("unibot-dark", String(dark)); }, [dark]);
+            return <PreferencesContext.Provider value={{campus, setCampus, dark, setDark}}>{children}</PreferencesContext.Provider>;
+        };
+        const SettingsControls = () => {
+            const {campus, setCampus, dark, setDark} = usePreferences();
+            const {uiLanguage, setLanguage, autoDetectEnabled, toggleAutoDetect} = useLanguage();
+            return <details className="text-sm"><summary className="cursor-pointer py-2">Settings</summary>
+                <div className="flex flex-wrap gap-3 py-3">
+                    <label>Campus <select value={campus} onChange={e => setCampus(e.target.value)} className="text-black rounded-lg">
+                        {["edinburgh", "scottish-borders", "orkney", "dubai", "malaysia"].map(c => <option key={c} value={c}>{c.replaceAll("-", " ")}</option>)}
+                    </select></label>
+                    <label>Language <select value={uiLanguage} onChange={e => setLanguage(e.target.value)} className="text-black rounded-lg">
+                        {LANG_OPTIONS.map(l => <option key={l.id} value={l.id}>{l.label || l.name || l.id}</option>)}
+                    </select></label>
+                    <label><input type="checkbox" checked={autoDetectEnabled} onChange={toggleAutoDetect}/> Detect reply language</label>
+                    <label><input type="checkbox" checked={dark} onChange={e => setDark(e.target.checked)}/> Dark mode</label>
+                </div>
+            </details>;
+        };
         const Header = ({ title }) => {
             const navigate = useNavigate();
             const t = useT();
@@ -469,7 +497,7 @@
                             </div>
                             <h1 className="font-bold">{title || t.appName}</h1>
                         </div>
-                        <button onClick={() => navigate("/onboarding")} className="px-3 py-2 bg-gray-100 dark:bg-gray-800 rounded-lg text-sm flex items-center gap-1">
+                        <SettingsControls /><button onClick={() => navigate("/onboarding")} className="px-3 py-2 bg-gray-100 dark:bg-gray-800 rounded-lg text-sm flex items-center gap-1">
                             <span className="material-symbols-outlined text-base">language</span>
                             <span>{t.language}</span>
                         </button>
@@ -486,6 +514,7 @@
                     <main className="max-w-[960px] mx-auto px-4 py-8">
                         <h2 className="text-3xl font-black">{t.homeTitle}</h2>
                         <p className="text-gray-500 mt-2">{t.homeSubtitle}</p>
+                        <details className="mt-5 text-sm max-w-prose"><summary>How your conversation is used</summary><p className="mt-2">Your messages are sent to our server and AI provider to prepare replies, and may be sent to a translation service. Conversations are held in server memory and expire after 30 minutes without activity, or earlier when capacity is reached. Reloading starts a new conversation. Avoid sharing sensitive personal information. Provider retention policies also apply.</p></details>
                         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-8">
                             <Link to="/chat" className="p-5 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
                                 <span className="material-symbols-outlined text-primary">forum</span>
@@ -684,6 +713,7 @@
         const ChatPage = () => {
             const t = useT();
             const { uiLanguage, autoDetectEnabled, setSessionDetectedLanguage } = useLanguage();
+            const {campus} = usePreferences();
 
             const [messages, setMessages] = useState(() => {
                 try {
@@ -698,6 +728,7 @@
 
             const [input, setInput] = useState("");
             const [loading, setLoading] = useState(false);
+            const [preview, setPreview] = useState("");
             const [followUps, setFollowUps] = useState(() => {
                 try {
                     const stored = localStorage.getItem(STORAGE_CHAT_FOLLOWUPS);
@@ -738,19 +769,21 @@
                 if (!input.trim() || loading) return;
                 const userText = input.trim();
                 setInput("");
+                setPreview("");
                 setLoading(true);
                 setMessages((prev) => [...prev, { role: "user", text: userText }]);
 
                 try {
                     // Make sure the server has started the new conversation first.
                     await newConversationReady;
-                    const res = await fetch(`${API_BASE}/rag-chat`, {
+                    const res = await fetch(`${API_BASE}/rag-chat/stream`, {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify({
                             message: userText,
                             conversation_id: getConversationId(),
                             ui_language: uiLanguage,
+                            campus,
                             auto_detect: autoDetectEnabled
                         }),
                     });
@@ -763,7 +796,27 @@
                         throw new Error(message);
                     }
 
-                    const data = await res.json();
+                    const reader = res.body.getReader();
+                    const decoder = new TextDecoder();
+                    let buffer = "", data = null;
+                    setPreview("");
+                    while (true) {
+                        const {value, done} = await reader.read();
+                        if (done) break;
+                        buffer += decoder.decode(value, {stream:true});
+                        let boundary;
+                        while ((boundary = buffer.indexOf("\n\n")) >= 0) {
+                            const frame = buffer.slice(0, boundary); buffer = buffer.slice(boundary + 2);
+                            const line = frame.split("\n").find(l => l.startsWith("data: "));
+                            if (!line) continue;
+                            const event = JSON.parse(line.slice(6));
+                            if (event.type === "preview") setPreview(event.text);
+                            if (event.type === "complete") data = event.response;
+                            if (event.type === "error") throw new Error(event.message);
+                        }
+                    }
+                    if (!data) throw new Error("The reply was interrupted. Please try again.");
+                    setPreview("");
                     const answer = typeof data.answer_markdown === "string" && data.answer_markdown.trim()
                         ? data.answer_markdown
                         : (typeof data.answer === "string" && data.answer.trim() ? data.answer : "");
@@ -826,7 +879,7 @@
                                         : "Heriot-Watt campus assistant"}
                                 </p>
                             </div>
-                            <button onClick={clearChat} className="px-3 py-1.5 text-sm bg-gray-100 dark:bg-gray-800 rounded-lg">{t.clear}</button>
+                            <SettingsControls /><button onClick={clearChat} className="px-3 py-1.5 text-sm bg-gray-100 dark:bg-gray-800 rounded-lg">{t.clear}</button>
                         </div>
 
                         <div className="flex-1 overflow-y-auto p-4 space-y-4 text-start">
@@ -838,6 +891,8 @@
                                             {isUser
                                                 ? <div className="whitespace-pre-wrap text-sm leading-relaxed">{msg.text}</div>
                                                 : <AnswerBody text={msg.text} citations={msg.citations} />}
+                                            {!isUser && msg.needsHumanHandoff && <p className="mt-3 text-sm"><Link className="underline" to="/services">Contact student support for personal guidance</Link></p>}
+                                            {!isUser && <Link className="block mt-2 text-xs underline" to={`/map?q=${encodeURIComponent((msg.text.match(/library|Oriam|student union|GRID|Learning Commons/i) || [""])[0])}`}>Find a place on the map</Link>}
                                             {!isUser && (
                                                 <SourceList
                                                     citations={msg.citations}
@@ -849,7 +904,8 @@
                                     </div>
                                 );
                             })}
-                            {loading && <div className="text-xs text-gray-500">...</div>}
+                            {loading && preview && <div className="p-3 bg-gray-100 dark:bg-gray-800 rounded-xl"><p className="text-xs mb-2">Draft answer · checking citations</p><p className="whitespace-pre-wrap text-sm">{preview}</p></div>}
+                            {loading && <div role="status" className="text-sm text-gray-500">Checking sources and preparing your answer…</div>}
                         </div>
 
                         {followUps.length > 0 && (
@@ -866,6 +922,7 @@
                         <div className="p-4 border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
                             <div className="flex items-center gap-2 bg-gray-100 dark:bg-gray-800 rounded-2xl px-3 py-2">
                                 <input
+                                    aria-label="Message to UniBot"
                                     className="flex-1 appearance-none border-0 bg-transparent px-1 py-2 text-sm outline-none shadow-none ring-0 focus:border-0 focus:outline-none focus:ring-0 focus:ring-transparent focus:ring-offset-0 focus:shadow-none"
                                     style={{ boxShadow: "none" }}
                                     value={input}
@@ -873,7 +930,7 @@
                                     onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); sendMessage(); }}}
                                     placeholder={t.chatPlaceholder}
                                 />
-                                <button onClick={sendMessage} disabled={loading || !input.trim()} className="bg-primary text-white w-10 h-10 rounded-xl disabled:opacity-50">
+                                <button aria-label="Send message" onClick={sendMessage} disabled={loading || !input.trim()} className="bg-primary text-white w-10 h-10 rounded-xl disabled:opacity-50">
                                     <span className="material-symbols-outlined text-xl">send</span>
                                 </button>
                             </div>
@@ -896,7 +953,8 @@
             const routeLayerRef = useRef(null);
             const originModeRef = useRef("manual");
 
-            const [searchQuery, setSearchQuery] = useState("");
+            const [searchQuery, setSearchQuery] = useState(() => new URLSearchParams(window.location.search).get("q") || "");
+            const {campus} = usePreferences();
             const [searchResults, setSearchResults] = useState([]);
             const [originSearchQuery, setOriginSearchQuery] = useState("");
             const [originSearchResults, setOriginSearchResults] = useState([]);
@@ -1047,14 +1105,14 @@
                 }
                 const timeout = setTimeout(async () => {
                     try {
-                        const res = await fetch(`${API_BASE}/api/places?query=${encodeURIComponent(term)}`);
+                        const res = await fetch(`${API_BASE}/api/places?campus=${encodeURIComponent(campus)}&query=${encodeURIComponent(term)}`);
                         if (!res.ok) return;
                         const data = await res.json();
                         setSearchResults(Array.isArray(data) ? data : []);
                     } catch (e) {}
                 }, 250);
                 return () => clearTimeout(timeout);
-            }, [searchQuery]);
+            }, [searchQuery, campus]);
 
             useEffect(() => {
                 const term = originSearchQuery.trim();
@@ -1064,7 +1122,7 @@
                 }
                 const timeout = setTimeout(async () => {
                     try {
-                        const res = await fetch(`${API_BASE}/api/places?query=${encodeURIComponent(term)}`);
+                        const res = await fetch(`${API_BASE}/api/places?campus=${encodeURIComponent(campus)}&query=${encodeURIComponent(term)}`);
                         if (!res.ok) return;
                         const data = await res.json();
                         setOriginSearchResults(Array.isArray(data) ? data : []);
@@ -1172,6 +1230,8 @@
 
             /* ── Nav mode state ── */
             const [navMode, setNavMode] = React.useState(false);
+            const [stepIndex, setStepIndex] = useState(0);
+            useEffect(() => {setStepIndex(0);}, [route]);
 
             return (
                 <div className="map-root" dir={activeLanguage === "ar" ? "rtl" : "ltr"}>
@@ -1432,6 +1492,7 @@
 
                         {/* ── Map Canvas ── */}
                         <div className="map-canvas">
+                            <div style={{position:"absolute", bottom:80, left:12, zIndex:500, maxWidth:340, maxHeight:"35%", overflow:"auto"}}><MapHours campus={campus}/></div>
                             <div id="map-el" ref={mapContainerRef} />
 
                             {/* FABs */}
@@ -1440,6 +1501,7 @@
                                     className="map-fab"
                                     style={{ background: locationPermission === "granted" ? "#135bec" : "#fff", color: locationPermission === "granted" ? "#fff" : "#374151" }}
                                     onClick={locationPermission === "granted" ? useMyLocationAsOrigin : enableLocation}
+                                    aria-label={t.mapEnableLocation}
                                     title={t.mapEnableLocation}
                                 >
                                     <span className="material-symbols-outlined" style={{ fontSize: 21 }}>
@@ -1451,6 +1513,7 @@
                                         className="map-fab"
                                         style={{ background: "#fff", color: "#374151" }}
                                         onClick={() => mapRef.current && routeLayerRef.current && mapRef.current.fitBounds(routeLayerRef.current.getBounds(), { padding: [40, 40] })}
+                                        aria-label="Fit route"
                                         title="Fit route"
                                     >
                                         <span className="material-symbols-outlined" style={{ fontSize: 20 }}>fit_screen</span>
@@ -1479,7 +1542,7 @@
                                             {Array.isArray(route.steps) && route.steps.length > 0 && (
                                                 <div style={{ marginTop: 8, fontSize: 13, opacity: .9, fontWeight: 500, display: "flex", alignItems: "center", gap: 6 }}>
                                                     <span className="material-symbols-outlined" style={{ fontSize: 18, flexShrink: 0 }}>turn_right</span>
-                                                    {route.steps[0].instruction}
+                                                    {route.steps[Math.min(stepIndex, route.steps.length - 1)].instruction}
                                                 </div>
                                             )}
                                         </div>
@@ -1487,6 +1550,11 @@
                                             <div style={{ fontSize: 22, fontWeight: 900 }}>{formatDuration(route.duration_s)}</div>
                                             <div style={{ fontSize: 12, opacity: .8 }}>{formatDistance(route.distance_m)}</div>
                                         </div>
+                                    </div>
+                                    <div className="flex gap-3 mt-3">
+                                        <button disabled={stepIndex === 0} onClick={() => setStepIndex(i => i - 1)}>Previous step</button>
+                                        <span aria-live="polite">Step {stepIndex + 1} of {route.steps.length}</span>
+                                        <button disabled={stepIndex >= route.steps.length - 1} onClick={() => setStepIndex(i => i + 1)}>Next step</button>
                                     </div>
                                     <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
                                         <button
@@ -1513,43 +1581,49 @@
             );
         };
 
-        const ServicesPage = () => {
-            const t = useT();
-            const cards = ["IT Services", "Housing", "Health & Wellbeing", "Academic Registry", "Careers", "Student Support"];
-            return (
-                <div className="min-h-screen pb-24">
-                    <Header />
-                    <main className="max-w-[960px] mx-auto px-4 py-8">
-                        <h2 className="text-3xl font-black">{t.servicesTitle}</h2>
-                        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-6">
-                            {cards.map((card) => (
-                                <div key={card} className="p-4 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">{card}</div>
-                            ))}
-                        </div>
-                    </main>
-                    <BottomNav active="services" />
-                </div>
-            );
+        const MapHours = ({campus}) => {
+            const [hours, setHours] = useState([]);
+            useEffect(() => {
+                let active = true;
+                setHours([]);
+                fetch(`${API_BASE}/api/opening-hours?campus=${encodeURIComponent(campus)}`)
+                    .then(r => r.ok ? r.json() : []).then(data => {if (active) setHours(data);}).catch(() => {});
+                return () => {active = false;};
+            }, [campus]);
+            return <details className="p-3 text-sm bg-white text-gray-900"><summary>Campus opening hours</summary>
+                {hours.length ? hours.map(h => <div key={h.url} className="py-2"><a className="underline" target="_blank" rel="noopener noreferrer" href={h.url}>{h.title}</a><p className="whitespace-pre-line mt-2">{h.description}</p></div>) : <p className="py-2">No opening hours are available here. Ask UniBot or check the venue’s official page.</p>}
+            </details>;
         };
-
-        const EventsPage = () => {
+        const CampusInformationPage = ({events = false}) => {
             const t = useT();
-            const items = ["Freshers Mixer", "Study Skills Workshop", "Club Fair", "Career Networking"];
-            return (
-                <div className="min-h-screen pb-24">
-                    <Header />
-                    <main className="max-w-[960px] mx-auto px-4 py-8">
-                        <h2 className="text-3xl font-black">{t.eventsTitle}</h2>
-                        <div className="space-y-3 mt-6">
-                            {items.map((item) => (
-                                <div key={item} className="p-4 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">{item}</div>
-                            ))}
-                        </div>
-                    </main>
-                    <BottomNav active="events" />
-                </div>
-            );
+            const {campus} = usePreferences();
+            const [items, setItems] = useState([]);
+            const [status, setStatus] = useState("loading");
+            const [retry, setRetry] = useState(0);
+            useEffect(() => {
+                const controller = new AbortController();
+                setStatus("loading");
+                fetch(`${API_BASE}/api/${events ? "events" : "services"}?campus=${encodeURIComponent(campus)}`, {signal: controller.signal})
+                    .then(r => { if (!r.ok) throw Error(); return r.json(); })
+                    .then(data => {setItems(data); setStatus("ready");})
+                    .catch(e => {if (e.name !== "AbortError") setStatus("error");});
+                return () => controller.abort();
+            }, [campus, events, retry]);
+            return <div className="min-h-screen pb-24"><Header />
+                <main className="max-w-[960px] mx-auto px-4 py-8">
+                    <h2 className="text-3xl font-black">{events ? t.eventsTitle : t.servicesTitle}</h2>
+                    <p className="mt-3">Official university information for {campus.replaceAll("-", " ")}. Check the source for the latest details.</p>
+                    {status === "loading" && <p role="status" className="py-6">Loading university information…</p>}
+                    {status === "error" && <p role="alert" className="py-6">Information could not be loaded. <button className="underline" onClick={() => setRetry(n => n+1)}>Try again</button></p>}
+                    {status === "ready" && !items.length && <p className="py-6">No {events ? "upcoming events" : "services"} are listed for this campus. Try another campus in Settings.</p>}
+                    {status === "ready" && <ul className="divide-y divide-gray-300 mt-6">{items.map(item => <li key={item.url} className="py-5">
+                        <h3 className="font-bold text-lg"><a className="underline text-primary" href={item.url} target="_blank" rel="noopener noreferrer">{item.title}</a></h3>
+                        {events ? <React.Fragment><p className="mt-2"><time dateTime={item.start}>{new Date(item.start).toLocaleString()}</time>{item.end && ` – ${new Date(item.end).toLocaleTimeString([], {hour: "2-digit", minute: "2-digit"})}`} (venue local time)</p><p>{item.location}</p><Link className="underline text-sm" to={`/map?q=${encodeURIComponent(item.location || item.title)}`}>Find venue on map</Link></React.Fragment> : <p className="mt-2 max-w-prose">{item.description}</p>}
+                    </li>)}</ul>}
+                </main><BottomNav active={events ? "events" : "services"}/></div>;
         };
+        const ServicesPage = () => <CampusInformationPage />;
+        const EventsPage = () => <CampusInformationPage events />;
 
         const OnboardingPage = () => {
             const navigate = useNavigate();
@@ -1606,7 +1680,7 @@
 
         const App = () => {
             return (
-                <LanguageProvider>
+                <LanguageProvider><Preferences>
                     <Routes>
                         <Route path="/" element={<HomePage />} />
                         <Route path="/chat" element={<ChatPage />} />
@@ -1615,7 +1689,7 @@
                         <Route path="/events" element={<EventsPage />} />
                         <Route path="/onboarding" element={<OnboardingPage />} />
                     </Routes>
-                </LanguageProvider>
+                </Preferences></LanguageProvider>
             );
         };
 

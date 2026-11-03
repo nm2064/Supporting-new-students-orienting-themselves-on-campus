@@ -12,6 +12,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from .api import router as api_router
+from .campus_info import router as campus_info_router
 from .config import validate_config
 from .logging_utils import configure_logging
 from .maps.router import router as maps_router
@@ -57,6 +58,7 @@ def create_app() -> FastAPI:
         )
 
     app.include_router(api_router)
+    app.include_router(campus_info_router)
     app.include_router(maps_router)
 
     # --- Serve frontend static files ---

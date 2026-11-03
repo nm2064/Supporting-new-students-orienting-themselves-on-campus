@@ -152,3 +152,13 @@ def test_rag_chat_returns_numbered_citations_with_title_and_link():
     assert citation["number"] == 1
     assert citation["title"] == "Library opening hours"
     assert citation["url"] == "https://www.hw.ac.uk/uk/students/library/opening-hours"
+
+
+def test_streamed_chat_ends_with_the_same_validated_response():
+    import json
+    client, _ = _client_with_overrides()
+    response = client.post('/rag-chat/stream', json={'message': 'Hello'})
+    assert response.status_code == 200
+    events = [json.loads(line[6:]) for line in response.text.splitlines() if line.startswith('data: ')]
+    assert events[-1]['type'] == 'complete'
+    assert events[-1]['response']['answer_markdown'] == 'Hello'

@@ -46,7 +46,7 @@ class PublicAccessMiddleware(BaseHTTPMiddleware):
         if request.method not in {"GET", "HEAD", "POST"}:
             return JSONResponse({"detail": "Method not allowed"}, status_code=405)
         if request.method == "POST":
-            if path == "/rag-chat":
+            if path in {"/rag-chat", "/rag-chat/stream"}:
                 from .settings import get_settings, ConfigurationError
                 try:
                     get_settings().validate_required()
@@ -56,7 +56,7 @@ class PublicAccessMiddleware(BaseHTTPMiddleware):
             expected = os.environ.get("PUBLIC_ORIGIN", "")
             if origin and origin != expected:
                 return JSONResponse({"detail": "Origin not allowed"}, status_code=403)
-            if path not in {"/rag-chat", "/api/route", "/reset-chat"}:
+            if path not in {"/rag-chat", "/rag-chat/stream", "/api/route", "/reset-chat"}:
                 return JSONResponse({"detail": "Not found"}, status_code=404)
             # Caddy also enforces this limit, including chunked requests.
             try:
