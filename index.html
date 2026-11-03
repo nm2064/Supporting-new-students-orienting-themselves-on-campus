@@ -544,74 +544,254 @@
             return I18N[activeLanguage] || I18N.en;
         };
 
-        const CHINESE_COPY = {
-            "Settings": "设置",
-            "Your preferences": "偏好设置",
-            "Make UniBot work for you.": "按你的需要设置校园助手。",
-            "Close settings": "关闭设置",
-            "Campus": "校区",
-            "Language": "语言",
-            "Edinburgh": "爱丁堡",
-            "Scottish Borders": "苏格兰边区",
-            "Orkney": "奥克尼",
-            "Dubai": "迪拜",
-            "Malaysia": "马来西亚",
-            "Sets the context for events, services and answers.": "用于选择活动、服务及回答所对应的校区。",
-            "Detect reply language": "自动识别回复语言",
-            "Reply in the language you write in.": "根据每条消息的语言回复。",
-            "Dark mode": "深色模式",
-            "A darker appearance for low light.": "适合光线较暗环境的显示效果。",
-            "Changes save automatically": "更改会自动保存",
-            "Done": "完成",
-            "A place to make your own": "找到属于你的校园生活",
-            "Discover Orkney": "探索奥克尼",
-            "Your campus. Your language. A little help settling in.": "熟悉校园，用你的语言，轻松开启大学生活。",
-            "Make yourself at home": "开启你的校园生活",
-            "Find your next step.": "找到适合你的下一步。",
-            "Explore campus": "探索校园",
-            "Find a building. Plan your route. Feel your way around.": "查找建筑、规划路线，熟悉校园。",
-            "Find support": "寻找支持",
-            "From study support to wellbeing, find the right people.": "从学习支持到身心健康，找到合适的帮助。",
-            "Meet people and find something to look forward to.": "认识新朋友，发现值得期待的活动。",
-            "See what’s on": "查看活动",
-            "Campus photography: Heriot-Watt University": "校园图片来源：赫瑞瓦特大学",
-            "Privacy & your conversation": "隐私与对话",
-            "Library opening hours": "图书馆开放时间",
-            "Find my way": "校园导航",
-            "Meet people": "结识朋友",
-            "Get support": "获取支持",
-            "When is the library open?": "图书馆什么时候开放？",
-            "How do I find the main library?": "怎么去主图书馆？",
-            "What student events are coming up?": "近期有哪些学生活动？",
-            "Where can I find student support?": "在哪里可以获得学生支持？",
-            "Conversation starters": "试试这些问题",
-            "Draft answer · checking citations": "回答草稿 · 正在核对来源",
-            "Checking sources and preparing your answer…": "正在查阅资料并准备回答……",
-            "Contact student support for personal guidance": "联系学生支持部门，获取针对你的帮助",
-            "Find a place on the map": "在地图上查找地点",
-            "Message to UniBot": "发送给校园助手的消息",
-            "Send message": "发送消息",
-            "Campus opening hours": "校园开放时间",
-            "Loading university information…": "正在加载学校信息……",
-            "Try again": "重试",
-            "View event": "查看活动",
-            "Find venue": "查找地点",
-            "About this service": "服务详情",
-            "Visit official page": "访问官方页面",
-            "No opening hours are available here. Ask UniBot or check the venue’s official page.": "暂无开放时间。请询问校园助手或查看该场所的官方页面。",
-            "Reply language": "回复语言",
-            "You are here": "你在这里",
-            "Information could not be loaded.": "信息加载失败。",
-            "venue local time": "场所当地时间",
-            "Official university information": "学校官方信息",
-            "Check the source for the latest details.": "请查看来源页面，确认最新详情。",
-            "No upcoming events are listed for this campus. Try another campus in Settings.": "该校区暂无即将举行的活动。可在设置中切换校区。",
-            "No services are listed for this campus. Try another campus in Settings.": "该校区暂无服务信息。可在设置中切换校区。",
-            "Messages are sent to our server and AI provider, and may be translated by an external service. Server conversations expire after 30 minutes of inactivity. Reloading starts a new conversation. Avoid sharing sensitive personal information. Provider policies also apply.": "你的消息会发送至我们的服务器和人工智能服务商，也可能通过外部服务翻译。服务器中的对话在闲置三十分钟后过期。重新加载页面会开始新对话。请勿分享敏感个人信息；服务商的隐私政策同样适用。"
+        const UI_COPY = {
+            "zh-Hans": {
+                        "Settings": "设置",
+                        "Your preferences": "偏好设置",
+                        "Make UniBot work for you.": "按你的需要设置校园助手。",
+                        "Close settings": "关闭设置",
+                        "Campus": "校区",
+                        "Language": "语言",
+                        "Edinburgh": "爱丁堡",
+                        "Scottish Borders": "苏格兰边区",
+                        "Orkney": "奥克尼",
+                        "Dubai": "迪拜",
+                        "Malaysia": "马来西亚",
+                        "Sets the context for events, services and answers.": "用于选择活动、服务及回答所对应的校区。",
+                        "Detect reply language": "自动识别回复语言",
+                        "Reply in the language you write in.": "根据每条消息的语言回复。",
+                        "Dark mode": "深色模式",
+                        "A darker appearance for low light.": "适合光线较暗环境的显示效果。",
+                        "Changes save automatically": "更改会自动保存",
+                        "Done": "完成",
+                        "A place to make your own": "找到属于你的校园生活",
+                        "Discover Orkney": "探索奥克尼",
+                        "Your campus. Your language. A little help settling in.": "熟悉校园，用你的语言，轻松开启大学生活。",
+                        "Make yourself at home": "开启你的校园生活",
+                        "Find your next step.": "找到适合你的下一步。",
+                        "Explore campus": "探索校园",
+                        "Find a building. Plan your route. Feel your way around.": "查找建筑、规划路线，熟悉校园。",
+                        "Find support": "寻找支持",
+                        "From study support to wellbeing, find the right people.": "从学习支持到身心健康，找到合适的帮助。",
+                        "Meet people and find something to look forward to.": "认识新朋友，发现值得期待的活动。",
+                        "See what’s on": "查看活动",
+                        "Campus photography: Heriot-Watt University": "校园图片来源：赫瑞瓦特大学",
+                        "Privacy & your conversation": "隐私与对话",
+                        "Library opening hours": "图书馆开放时间",
+                        "Find my way": "校园导航",
+                        "Meet people": "结识朋友",
+                        "Get support": "获取支持",
+                        "When is the library open?": "图书馆什么时候开放？",
+                        "How do I find the main library?": "怎么去主图书馆？",
+                        "What student events are coming up?": "近期有哪些学生活动？",
+                        "Where can I find student support?": "在哪里可以获得学生支持？",
+                        "Conversation starters": "试试这些问题",
+                        "Draft answer · checking citations": "回答草稿 · 正在核对来源",
+                        "Checking sources and preparing your answer…": "正在查阅资料并准备回答……",
+                        "Contact student support for personal guidance": "联系学生支持部门，获取针对你的帮助",
+                        "Find a place on the map": "在地图上查找地点",
+                        "Message to UniBot": "发送给校园助手的消息",
+                        "Send message": "发送消息",
+                        "Campus opening hours": "校园开放时间",
+                        "Loading university information…": "正在加载学校信息……",
+                        "Try again": "重试",
+                        "View event": "查看活动",
+                        "Find venue": "查找地点",
+                        "About this service": "服务详情",
+                        "Visit official page": "访问官方页面",
+                        "No opening hours are available here. Ask UniBot or check the venue’s official page.": "暂无开放时间。请询问校园助手或查看该场所的官方页面。",
+                        "Reply language": "回复语言",
+                        "You are here": "你在这里",
+                        "Information could not be loaded.": "信息加载失败。",
+                        "venue local time": "场所当地时间",
+                        "Official university information": "学校官方信息",
+                        "Check the source for the latest details.": "请查看来源页面，确认最新详情。",
+                        "No upcoming events are listed for this campus. Try another campus in Settings.": "该校区暂无即将举行的活动。可在设置中切换校区。",
+                        "No services are listed for this campus. Try another campus in Settings.": "该校区暂无服务信息。可在设置中切换校区。",
+                        "Messages are sent to our server and AI provider, and may be translated by an external service. Server conversations expire after 30 minutes of inactivity. Reloading starts a new conversation. Avoid sharing sensitive personal information. Provider policies also apply.": "你的消息会发送至我们的服务器和人工智能服务商，也可能通过外部服务翻译。服务器中的对话在闲置三十分钟后过期。重新加载页面会开始新对话。请勿分享敏感个人信息；服务商的隐私政策同样适用。",
+                        "Search for a campus building to get started": "搜索校园建筑，开始使用",
+                        "Navigating to": "正在前往",
+                        "Previous step": "上一步",
+                        "Next step": "下一步",
+                        "Exit Navigation": "退出导航",
+                        "Fit route": "显示完整路线",
+                        "Step": "步骤",
+                        "of": "共",
+                        "Active": "已启用",
+                        "Auto-detected this session": "本次对话识别的语言",
+                        "Map engine failed to load. Refresh the page.": "地图加载失败，请刷新页面。",
+                        "The AI assistant is being configured. Please check back soon.": "助手正在配置中，请稍后重试。",
+                        "The demo has reached its request limit. Please try again later.": "请求次数已达上限，请稍后重试。",
+                        "Could not get a response. Please try again.": "未能获取回答，请重试。",
+                        "The reply was interrupted. Please try again.": "回答已中断，请重试。",
+                        "The assistant is temporarily unavailable. Please try again.": "助手暂时不可用，请重试。"
+            },
+            "hi": {
+                        "Settings": "सेटिंग्स",
+                        "Your preferences": "आपकी प्राथमिकताएँ",
+                        "Make UniBot work for you.": "यूनीबॉट को अपनी ज़रूरत के अनुसार सेट करें।",
+                        "Close settings": "सेटिंग्स बंद करें",
+                        "Campus": "परिसर",
+                        "Language": "भाषा",
+                        "Edinburgh": "एडिनबरा",
+                        "Scottish Borders": "स्कॉटिश बॉर्डर्स",
+                        "Orkney": "ऑर्कनी",
+                        "Dubai": "दुबई",
+                        "Malaysia": "मलेशिया",
+                        "Sets the context for events, services and answers.": "गतिविधियों, सेवाओं और उत्तरों के लिए परिसर चुनें।",
+                        "Detect reply language": "उत्तर की भाषा अपने आप पहचानें",
+                        "Reply in the language you write in.": "आपके हर संदेश की भाषा में उत्तर दें।",
+                        "Dark mode": "डार्क मोड",
+                        "A darker appearance for low light.": "कम रोशनी में गहरे रंगों वाला रूप।",
+                        "Changes save automatically": "बदलाव अपने आप सहेजे जाते हैं",
+                        "Done": "हो गया",
+                        "A place to make your own": "अपनापन महसूस करें",
+                        "Discover Orkney": "ऑर्कनी जानें",
+                        "Your campus. Your language. A little help settling in.": "आपका परिसर। आपकी भाषा। नई शुरुआत में थोड़ी मदद।",
+                        "Make yourself at home": "परिसर में अपनापन पाएँ",
+                        "Find your next step.": "अपना अगला कदम खोजें।",
+                        "Explore campus": "परिसर जानें",
+                        "Find a building. Plan your route. Feel your way around.": "इमारत खोजें। रास्ता बनाएँ। परिसर को जानें।",
+                        "Find support": "सहायता खोजें",
+                        "From study support to wellbeing, find the right people.": "पढ़ाई से लेकर स्वास्थ्य तक, सही सहायता पाएँ।",
+                        "Meet people and find something to look forward to.": "नए लोगों से मिलें और आने वाली गतिविधियाँ जानें।",
+                        "See what’s on": "गतिविधियाँ देखें",
+                        "Campus photography: Heriot-Watt University": "परिसर के चित्र: हेरियट-वाट विश्वविद्यालय",
+                        "Privacy & your conversation": "गोपनीयता और आपकी बातचीत",
+                        "Library opening hours": "पुस्तकालय का समय",
+                        "Find my way": "रास्ता खोजें",
+                        "Meet people": "लोगों से मिलें",
+                        "Get support": "सहायता पाएँ",
+                        "When is the library open?": "पुस्तकालय कब खुलता है?",
+                        "How do I find the main library?": "मुख्य पुस्तकालय कैसे पहुँचूँ?",
+                        "What student events are coming up?": "जल्द कौन-सी छात्र गतिविधियाँ हैं?",
+                        "Where can I find student support?": "छात्र सहायता कहाँ मिल सकती है?",
+                        "Conversation starters": "बातचीत शुरू करें",
+                        "Draft answer · checking citations": "उत्तर का मसौदा · स्रोतों की जाँच जारी है",
+                        "Checking sources and preparing your answer…": "स्रोत जाँचकर आपका उत्तर तैयार कर रहे हैं…",
+                        "Contact student support for personal guidance": "व्यक्तिगत मार्गदर्शन के लिए छात्र सहायता से संपर्क करें",
+                        "Find a place on the map": "नक्शे पर स्थान खोजें",
+                        "Message to UniBot": "यूनीबॉट को संदेश",
+                        "Send message": "संदेश भेजें",
+                        "Campus opening hours": "परिसर खुलने का समय",
+                        "Loading university information…": "विश्वविद्यालय की जानकारी लोड हो रही है…",
+                        "Try again": "फिर कोशिश करें",
+                        "View event": "गतिविधि देखें",
+                        "Find venue": "स्थान खोजें",
+                        "About this service": "इस सेवा के बारे में",
+                        "Visit official page": "आधिकारिक पृष्ठ देखें",
+                        "No opening hours are available here. Ask UniBot or check the venue’s official page.": "समय उपलब्ध नहीं है। यूनीबॉट से पूछें या स्थान का आधिकारिक पृष्ठ देखें।",
+                        "Reply language": "उत्तर की भाषा",
+                        "You are here": "आप यहाँ हैं",
+                        "Information could not be loaded.": "जानकारी लोड नहीं हो सकी।",
+                        "venue local time": "स्थान का स्थानीय समय",
+                        "Official university information": "विश्वविद्यालय की आधिकारिक जानकारी",
+                        "Check the source for the latest details.": "नवीनतम विवरण के लिए स्रोत देखें।",
+                        "No upcoming events are listed for this campus. Try another campus in Settings.": "इस परिसर के लिए आगामी गतिविधियाँ सूचीबद्ध नहीं हैं। सेटिंग्स में दूसरा परिसर चुनें।",
+                        "No services are listed for this campus. Try another campus in Settings.": "इस परिसर की सेवाएँ सूचीबद्ध नहीं हैं। सेटिंग्स में दूसरा परिसर चुनें।",
+                        "Messages are sent to our server and AI provider, and may be translated by an external service. Server conversations expire after 30 minutes of inactivity. Reloading starts a new conversation. Avoid sharing sensitive personal information. Provider policies also apply.": "आपके संदेश हमारे सर्वर और कृत्रिम बुद्धिमत्ता प्रदाता को भेजे जाते हैं। अनुवाद के लिए बाहरी सेवा का उपयोग भी हो सकता है। तीस मिनट तक निष्क्रिय रहने पर सर्वर की बातचीत समाप्त हो जाती है। पृष्ठ फिर लोड करने पर नई बातचीत शुरू होती है। संवेदनशील व्यक्तिगत जानकारी साझा न करें। प्रदाता की नीतियाँ भी लागू होती हैं।",
+                        "Search for a campus building to get started": "शुरू करने के लिए परिसर की इमारत खोजें",
+                        "Navigating to": "यहाँ जा रहे हैं",
+                        "Previous step": "पिछला चरण",
+                        "Next step": "अगला चरण",
+                        "Exit Navigation": "नेविगेशन बंद करें",
+                        "Fit route": "पूरा रास्ता दिखाएँ",
+                        "Step": "चरण",
+                        "of": "में से",
+                        "Active": "सक्रिय",
+                        "Auto-detected this session": "इस बातचीत में पहचानी गई भाषा",
+                        "Map engine failed to load. Refresh the page.": "नक्शा लोड नहीं हुआ। पृष्ठ फिर लोड करें।",
+                        "The AI assistant is being configured. Please check back soon.": "सहायक को सेट किया जा रहा है। थोड़ी देर में फिर आएँ।",
+                        "The demo has reached its request limit. Please try again later.": "अनुरोध सीमा पूरी हो गई है। बाद में फिर कोशिश करें।",
+                        "Could not get a response. Please try again.": "उत्तर नहीं मिला। फिर कोशिश करें।",
+                        "The reply was interrupted. Please try again.": "उत्तर बीच में रुक गया। फिर कोशिश करें।",
+                        "The assistant is temporarily unavailable. Please try again.": "सहायक अभी उपलब्ध नहीं है। फिर कोशिश करें।"
+            },
+            "ar": {
+                        "Settings": "الإعدادات",
+                        "Your preferences": "تفضيلاتك",
+                        "Make UniBot work for you.": "اضبط يونيبوت بما يناسبك.",
+                        "Close settings": "إغلاق الإعدادات",
+                        "Campus": "الحرم الجامعي",
+                        "Language": "اللغة",
+                        "Edinburgh": "إدنبرة",
+                        "Scottish Borders": "الحدود الاسكتلندية",
+                        "Orkney": "أوركني",
+                        "Dubai": "دبي",
+                        "Malaysia": "ماليزيا",
+                        "Sets the context for events, services and answers.": "يحدد الحرم الجامعي للفعاليات والخدمات والإجابات.",
+                        "Detect reply language": "اكتشاف لغة الرد تلقائيًا",
+                        "Reply in the language you write in.": "الرد بلغة كل رسالة تكتبها.",
+                        "Dark mode": "الوضع الداكن",
+                        "A darker appearance for low light.": "مظهر داكن يناسب الإضاءة المنخفضة.",
+                        "Changes save automatically": "تُحفظ التغييرات تلقائيًا",
+                        "Done": "تم",
+                        "A place to make your own": "مكان تشعر فيه بالانتماء",
+                        "Discover Orkney": "اكتشف أوركني",
+                        "Your campus. Your language. A little help settling in.": "حرمك الجامعي. لغتك. مساعدة بسيطة لبداية أسهل.",
+                        "Make yourself at home": "ابدأ حياتك الجامعية",
+                        "Find your next step.": "اكتشف خطوتك التالية.",
+                        "Explore campus": "استكشف الحرم الجامعي",
+                        "Find a building. Plan your route. Feel your way around.": "اعثر على مبنى، وخطط لمسارك، وتعرّف على الحرم.",
+                        "Find support": "ابحث عن الدعم",
+                        "From study support to wellbeing, find the right people.": "من دعم الدراسة إلى العافية، اعثر على المساعدة المناسبة.",
+                        "Meet people and find something to look forward to.": "تعرّف على أصدقاء جدد واكتشف الفعاليات القادمة.",
+                        "See what’s on": "اكتشف الفعاليات",
+                        "Campus photography: Heriot-Watt University": "صور الحرم الجامعي: جامعة هيريوت وات",
+                        "Privacy & your conversation": "الخصوصية ومحادثتك",
+                        "Library opening hours": "ساعات عمل المكتبة",
+                        "Find my way": "اعثر على طريقي",
+                        "Meet people": "تعرّف على الآخرين",
+                        "Get support": "احصل على الدعم",
+                        "When is the library open?": "متى تفتح المكتبة؟",
+                        "How do I find the main library?": "كيف أصل إلى المكتبة الرئيسية؟",
+                        "What student events are coming up?": "ما الفعاليات الطلابية القادمة؟",
+                        "Where can I find student support?": "أين أجد دعم الطلاب؟",
+                        "Conversation starters": "ابدأ محادثة",
+                        "Draft answer · checking citations": "مسودة الإجابة · جارٍ التحقق من المصادر",
+                        "Checking sources and preparing your answer…": "جارٍ مراجعة المصادر وإعداد إجابتك…",
+                        "Contact student support for personal guidance": "تواصل مع دعم الطلاب للحصول على إرشاد يناسبك",
+                        "Find a place on the map": "ابحث عن مكان على الخريطة",
+                        "Message to UniBot": "رسالة إلى يونيبوت",
+                        "Send message": "إرسال الرسالة",
+                        "Campus opening hours": "ساعات فتح مرافق الحرم",
+                        "Loading university information…": "جارٍ تحميل معلومات الجامعة…",
+                        "Try again": "حاول مجددًا",
+                        "View event": "عرض الفعالية",
+                        "Find venue": "اعثر على المكان",
+                        "About this service": "عن هذه الخدمة",
+                        "Visit official page": "زيارة الصفحة الرسمية",
+                        "No opening hours are available here. Ask UniBot or check the venue’s official page.": "ساعات الفتح غير متاحة هنا. اسأل يونيبوت أو راجع الصفحة الرسمية للمكان.",
+                        "Reply language": "لغة الرد",
+                        "You are here": "أنت هنا",
+                        "Information could not be loaded.": "تعذر تحميل المعلومات.",
+                        "venue local time": "التوقيت المحلي للمكان",
+                        "Official university information": "معلومات الجامعة الرسمية",
+                        "Check the source for the latest details.": "راجع المصدر للاطلاع على أحدث التفاصيل.",
+                        "No upcoming events are listed for this campus. Try another campus in Settings.": "لا توجد فعاليات قادمة مدرجة لهذا الحرم. جرّب حرمًا آخر في الإعدادات.",
+                        "No services are listed for this campus. Try another campus in Settings.": "لا توجد خدمات مدرجة لهذا الحرم. جرّب حرمًا آخر في الإعدادات.",
+                        "Messages are sent to our server and AI provider, and may be translated by an external service. Server conversations expire after 30 minutes of inactivity. Reloading starts a new conversation. Avoid sharing sensitive personal information. Provider policies also apply.": "تُرسل رسائلك إلى خادمنا ومزوّد الذكاء الاصطناعي، وقد تُترجم عبر خدمة خارجية. تنتهي المحادثات على الخادم بعد ثلاثين دقيقة من عدم النشاط. تبدأ محادثة جديدة عند إعادة تحميل الصفحة. تجنّب مشاركة المعلومات الشخصية الحساسة. وتنطبق أيضًا سياسات المزوّد.",
+                        "Search for a campus building to get started": "ابحث عن مبنى في الحرم للبدء",
+                        "Navigating to": "الملاحة إلى",
+                        "Previous step": "الخطوة السابقة",
+                        "Next step": "الخطوة التالية",
+                        "Exit Navigation": "إنهاء الملاحة",
+                        "Fit route": "عرض المسار كاملًا",
+                        "Step": "الخطوة",
+                        "of": "من",
+                        "Active": "مفعّلة",
+                        "Auto-detected this session": "اللغة المكتشفة لهذه المحادثة",
+                        "Map engine failed to load. Refresh the page.": "تعذر تحميل الخريطة. أعد تحميل الصفحة.",
+                        "The AI assistant is being configured. Please check back soon.": "جارٍ إعداد المساعد. حاول بعد قليل.",
+                        "The demo has reached its request limit. Please try again later.": "تم بلوغ حد الطلبات. حاول لاحقًا.",
+                        "Could not get a response. Please try again.": "تعذر الحصول على رد. حاول مجددًا.",
+                        "The reply was interrupted. Please try again.": "انقطع الرد. حاول مجددًا.",
+                        "The assistant is temporarily unavailable. Please try again.": "المساعد غير متاح مؤقتًا. حاول مجددًا."
+            }
 };
         const useCopy = () => {
             const {activeLanguage} = useLanguage();
-            return text => activeLanguage === "zh-Hans" ? (CHINESE_COPY[text] || text) : text;
+            return text => (UI_COPY[activeLanguage] || {})[text] || text;
         };
         const BottomNav = ({ active }) => {
             const t = useT();
@@ -990,10 +1170,10 @@
                     });
                     if (!res.ok) {
                         const message = res.status === 503
-                            ? "The AI assistant is being configured. Please check back soon."
+                            ? c("The AI assistant is being configured. Please check back soon.")
                             : res.status === 429
-                                ? "The demo has reached its request limit. Please try again later."
-                                : "Could not get a response. Please try again.";
+                                ? c("The demo has reached its request limit. Please try again later.")
+                                : c("Could not get a response. Please try again.");
                         throw new Error(message);
                     }
 
@@ -1013,10 +1193,10 @@
                             const event = JSON.parse(line.slice(6));
                             if (event.type === "preview") setPreview(event.text);
                             if (event.type === "complete") data = event.response;
-                            if (event.type === "error") throw new Error(event.message);
+                            if (event.type === "error") throw new Error(c(event.message));
                         }
                     }
-                    if (!data) throw new Error("The reply was interrupted. Please try again.");
+                    if (!data) throw new Error(c("The reply was interrupted. Please try again."));
                     setPreview("");
                     const answer = typeof data.answer_markdown === "string" && data.answer_markdown.trim()
                         ? data.answer_markdown
@@ -1149,6 +1329,7 @@
         };
 
         const MapPage = () => {
+            const c = useCopy();
             const t = useT();
             const { activeLanguage } = useLanguage();
             const mapContainerRef = useRef(null);
@@ -1505,7 +1686,7 @@
                                 {!selectedDestination && searchResults.length === 0 && (
                                     <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 8, padding: "40px 0", opacity: 0.5 }}>
                                         <span className="material-symbols-outlined" style={{ fontSize: 48, color: "#9ca3af" }}>explore</span>
-                                        <div style={{ fontSize: 14, color: "#6b7280", textAlign: "center" }}>Search for a campus building to get started</div>
+                                        <div style={{ fontSize: 14, color: "#6b7280", textAlign: "center" }}>{c("Search for a campus building to get started")}</div>
                                     </div>
                                 )}
 
@@ -1720,8 +1901,8 @@
                                         className="map-fab"
                                         style={{ background: "#fff", color: "#374151" }}
                                         onClick={() => mapRef.current && routeLayerRef.current && mapRef.current.fitBounds(routeLayerRef.current.getBounds(), { padding: [40, 40] })}
-                                        aria-label="Fit route"
-                                        title="Fit route"
+                                        aria-label={c("Fit route")}
+                                        title={c("Fit route")}
                                     >
                                         <span className="material-symbols-outlined" style={{ fontSize: 20 }}>fit_screen</span>
                                     </button>
@@ -1732,7 +1913,7 @@
                             {(locationPermission === "denied" || locationPermission === "unavailable" || !leafletReady) && (
                                 <div style={{ position: "absolute", top: 14, left: 14, right: 70, zIndex: 500 }}>
                                     <div style={{ background: "#fef2f2", color: "#b91c1c", fontSize: 12, padding: "8px 14px", borderRadius: 10, boxShadow: "0 2px 8px rgba(0,0,0,.10)" }}>
-                                        {!leafletReady ? "Map engine failed to load. Refresh the page."
+                                        {!leafletReady ? c("Map engine failed to load. Refresh the page.")
                                             : locationPermission === "denied" ? t.mapLocationDenied
                                             : t.mapLocationUnavailable}
                                     </div>
@@ -1744,7 +1925,7 @@
                                 <div className="nav-hud">
                                     <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
                                         <div style={{ flex: 1 }}>
-                                            <div style={{ fontSize: 11, opacity: .8, fontWeight: 500, marginBottom: 2 }}>Navigating to</div>
+                                            <div style={{ fontSize: 11, opacity: .8, fontWeight: 500, marginBottom: 2 }}>{c("Navigating to")}</div>
                                             <div style={{ fontSize: 16, fontWeight: 700, lineHeight: 1.2 }}>{selectedDestination ? selectedDestination.name : ""}</div>
                                             {Array.isArray(route.steps) && route.steps.length > 0 && (
                                                 <div style={{ marginTop: 8, fontSize: 13, opacity: .9, fontWeight: 500, display: "flex", alignItems: "center", gap: 6 }}>
@@ -1759,16 +1940,16 @@
                                         </div>
                                     </div>
                                     <div className="flex gap-3 mt-3">
-                                        <button disabled={stepIndex === 0} onClick={() => setStepIndex(i => i - 1)}>Previous step</button>
-                                        <span aria-live="polite">Step {stepIndex + 1} of {route.steps.length}</span>
-                                        <button disabled={stepIndex >= route.steps.length - 1} onClick={() => setStepIndex(i => i + 1)}>Next step</button>
+                                        <button disabled={stepIndex === 0} onClick={() => setStepIndex(i => i - 1)}>{c("Previous step")}</button>
+                                        <span aria-live="polite">{c("Step")} {stepIndex + 1} {c("of")} {route.steps.length}</span>
+                                        <button disabled={stepIndex >= route.steps.length - 1} onClick={() => setStepIndex(i => i + 1)}>{c("Next step")}</button>
                                     </div>
                                     <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
                                         <button
                                             onClick={() => setNavMode(false)}
                                             style={{ flex: 1, height: 36, borderRadius: 18, border: "1.5px solid rgba(255,255,255,.5)", background: "none", color: "#fff", fontFamily: "inherit", fontWeight: 600, fontSize: 13, cursor: "pointer" }}
                                         >
-                                            Exit Navigation
+                                            {c("Exit Navigation")}
                                         </button>
                                         <button
                                             onClick={() => { mapRef.current && routeLayerRef.current && mapRef.current.fitBounds(routeLayerRef.current.getBounds(), { padding: [40, 40] }); }}
@@ -1840,6 +2021,7 @@
         const EventsPage = () => <CampusInformationPage events />;
 
         const OnboardingPage = () => {
+            const c = useCopy();
             const navigate = useNavigate();
             const t = useT();
             const {
@@ -1865,7 +2047,7 @@
                             <div><span className="font-semibold">{t.activeLanguage}:</span> {getLangLabel(activeLanguage)}</div>
                             <div className="mt-1"><span className="font-semibold">{t.selectedLanguage}:</span> {getLangLabel(uiLanguage)}</div>
                             {sessionDetectedLanguage && autoDetectEnabled && (
-                                <div className="mt-1 text-primary">Auto-detected this session: {getLangLabel(sessionDetectedLanguage)}</div>
+                                <div className="mt-1 text-primary">{c("Auto-detected this session")}: {getLangLabel(sessionDetectedLanguage)}</div>
                             )}
                         </div>
 
@@ -1874,7 +2056,7 @@
                                 <label key={lang.id} className={`flex items-center gap-3 p-3 border-2 rounded-xl cursor-pointer ${activeLanguage === lang.id ? "border-primary bg-primary/5" : "border-gray-200 dark:border-gray-700"}`}>
                                     <input type="radio" checked={uiLanguage === lang.id} onChange={() => setLanguage(lang.id)} />
                                     <span className="font-medium">{lang.label}</span>
-                                    {activeLanguage === lang.id && <span className="text-xs text-primary ml-auto">Active</span>}
+                                    {activeLanguage === lang.id && <span className="text-xs text-primary ml-auto">{c("Active")}</span>}
                                 </label>
                             ))}
                         </div>

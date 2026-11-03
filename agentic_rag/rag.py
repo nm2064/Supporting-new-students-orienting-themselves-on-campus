@@ -1049,6 +1049,18 @@ class AgenticRAG:
                 "ar": r"\b(?:answer|reply|respond|write|speak)\s+(?:only\s+)?in\s+Arabic\b",
                 "hi": r"\b(?:answer|reply|respond|write|speak)\s+(?:only\s+)?in\s+Hindi\b",
             }
+            native_names = {
+                "en": ("英语|英文", "अंग्रेज़ी|अंग्रेजी", "الإنجليزية|الانجليزية"),
+                "zh-Hans": ("中文|简体中文|汉语", "चीनी|सरलीकृत चीनी", "الصينية|الصينية المبسطة"),
+                "hi": ("印地语", "हिंदी|हिन्दी", "الهندية"),
+                "ar": ("阿拉伯语", "अरबी", "العربية"),
+            }
+            for language, (chinese, hindi, arabic) in native_names.items():
+                requests[language] += (
+                    r"|(?:用|使用|以)(?:" + chinese + r")(?:回答|回复|作答)"
+                    r"|(?:" + hindi + r")\s+में\s+(?:उत्तर|जवाब|बात)"
+                    r"|(?:أجب|اجب|الرد|رد|الإجابة)\s+(?:باللغة\s+)?ب?(?:" + arabic + r")"
+                )
             matches = [(match.start(), language) for language, pattern in requests.items()
                        for match in re.finditer(pattern, query, re.IGNORECASE)
                        if not re.search(r"(?:not|never|don't)\s*$", query[:match.start()], re.IGNORECASE)]
@@ -1144,7 +1156,7 @@ class AgenticRAG:
 
         answer_markdown, citations, sources = self._cite_pages(relevant_chunks, answer_markdown)
         translated_titles = answer_payload.get("source_titles", {})
-        if effective_language != "en" and isinstance(translated_titles, dict):
+        if isinstance(translated_titles, dict):
             for citation in citations:
                 title = translated_titles.get(citation["url"])
                 if isinstance(title, str) and title.strip():
@@ -1171,30 +1183,35 @@ class AgenticRAG:
 
         # Repair mixed-language prose once, before storing or returning the final
         # answer. Reject rewrites that change citation markers or destination URLs.
-        if effective_language != "en":
-            prose = re.sub(r"https?://\S+|[\w.+-]+@[\w.-]+", "", " ".join([answer_markdown, *map(str, follow_ups)]))
-            prose = re.sub(r"\b[A-Z0-9]{2,}\b", "", prose)
-            if re.search(r"\b[a-z][a-z]+\b", prose, re.IGNORECASE):
-                try:
-                    localized = self.backend.chat_json(
-                        system_prompt=(
-                            "LOCALIZE_FINAL: Translate ALL prose to " + LANGUAGE_LABELS[effective_language] +
-                            ". Translate facility names, headings and follow-up questions. Keep acronyms, URLs, "
-                            "numbers, facts and every [n] citation exactly unchanged. Add no information. "
-                            "Return JSON with answer_markdown and follow_up_suggestions."
-                        ),
-                        user_prompt=json.dumps({"answer_markdown": answer_markdown, "follow_up_suggestions": follow_ups}, ensure_ascii=False),
-                        model=self.settings.chat_model,
-                    )
-                    candidate = localized.get("answer_markdown", "")
-                    same_markers = sorted(re.findall(r"\[\d+\]", candidate)) == sorted(re.findall(r"\[\d+\]", answer_markdown))
-                    same_urls = re.findall(r"https?://[^\s<>\)]+", candidate) == re.findall(r"https?://[^\s<>\)]+", answer_markdown)
-                    suggestions = localized.get("follow_up_suggestions")
-                    if isinstance(candidate, str) and candidate.strip() and same_markers and same_urls and isinstance(suggestions, list):
-                        answer_markdown = candidate
-                        follow_ups = [str(item) for item in suggestions[:3]]
-                except Exception as error:
-                    logger.warning("Language repair unavailable (%s)", type(error).__name__)
+        prose = re.sub(r"https?://\S+|[\w.+-]+@[\w.-]+", "", " ".join([answer_markdown, *map(str, follow_ups)]))
+        prose = re.sub(r"\b[A-Z0-9]{2,}\b", "", prose)
+        foreign_script = any(
+            len(re.findall(pattern, prose)) >= 2
+            for language, pattern in [("zh-Hans", r"[\u3400-\u9fff]"), ("hi", r"[\u0900-\u097f]"), ("ar", r"[\u0600-\u06ff]")]
+            if language != effective_language
+        )
+        foreign_latin = effective_language != "en" and bool(re.search(r"\b[a-z][a-z]+\b", prose, re.IGNORECASE))
+        if foreign_script or foreign_latin:
+            try:
+                localized = self.backend.chat_json(
+                    system_prompt=(
+                        "LOCALIZE_FINAL: Translate ALL prose to " + LANGUAGE_LABELS[effective_language] +
+                        ". Translate facility names, headings and follow-up questions. Keep acronyms, URLs, "
+                        "numbers, facts and every [n] citation exactly unchanged. Add no information. "
+                        "Return JSON with answer_markdown and follow_up_suggestions."
+                    ),
+                    user_prompt=json.dumps({"answer_markdown": answer_markdown, "follow_up_suggestions": follow_ups}, ensure_ascii=False),
+                    model=self.settings.chat_model,
+                )
+                candidate = localized.get("answer_markdown", "")
+                same_markers = sorted(re.findall(r"\[\d+\]", candidate)) == sorted(re.findall(r"\[\d+\]", answer_markdown))
+                same_urls = re.findall(r"https?://[^\s<>\)]+", candidate) == re.findall(r"https?://[^\s<>\)]+", answer_markdown)
+                suggestions = localized.get("follow_up_suggestions")
+                if isinstance(candidate, str) and candidate.strip() and same_markers and same_urls and isinstance(suggestions, list):
+                    answer_markdown = candidate
+                    follow_ups = [str(item) for item in suggestions[:3]]
+            except Exception as error:
+                logger.warning("Language repair unavailable (%s)", type(error).__name__)
 
         log_event(
             logger,

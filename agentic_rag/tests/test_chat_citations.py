@@ -365,3 +365,74 @@ def test_language_repair_cannot_drop_citations_or_replace_source_links(knowledge
     response=rag.chat(question)
     assert '[1]' in response.answer_markdown
     assert response.citations[0]['url'] == OPENING_HOURS_URL
+
+
+@pytest.mark.parametrize('language,answer,suggestion', [
+    ('en','The library is open 24 hours [1].','How do I book a room?'),
+    ('zh-Hans','图书馆全天开放[1]。','如何预约学习室？'),
+    ('hi','पुस्तकालय 24 घंटे खुला है[1]।','कमरा कैसे बुक करूँ?'),
+    ('ar','المكتبة مفتوحة على مدار 24 ساعة[1].','كيف أحجز غرفة؟'),
+])
+def test_every_reply_language_repairs_foreign_prose_and_preserves_citations(knowledge_settings, language, answer, suggestion):
+    class MultilingualRepair(FakeKnowledgeLLM):
+        def chat_json(self, system_prompt, user_prompt, **kwargs):
+            if 'LOCALIZE_FINAL' in system_prompt:
+                return {'answer_markdown':answer,'follow_up_suggestions':[suggestion]}
+            return super().chat_json(system_prompt,user_prompt,**kwargs)
+    # English must repair non-English output too, not just the reverse.
+    bad = {
+        'en':'图书馆全天开放{cite:open 24 hours}。',
+        'zh-Hans':'पुस्तकालय खुला है{cite:open 24 hours}।',
+        'hi':'المكتبة مفتوحة{cite:open 24 hours}.',
+        'ar':'Library open 24 hours {cite:open 24 hours}.',
+    }[language]
+    rag=build_rag(knowledge_settings,MultilingualRepair(bad),translator=FakeTranslator())
+    result=rag.chat('What are the library opening hours?',ui_language=language,auto_detect=False)
+    assert result.answer_markdown == answer
+    assert result.follow_up_suggestions == [suggestion]
+    assert result.citations[0]['url'] == OPENING_HOURS_URL
+
+
+@pytest.mark.parametrize('language,question,reply', [
+    ('en','What are the library opening hours?','The library is open 24 hours'),
+    ('zh-Hans','Learning Commons几点关门？','图书馆全天开放'),
+    ('hi','GRID कहाँ है?','पुस्तकालय 24 घंटे खुला है'),
+    ('ar','أين مكتبة GRID؟','المكتبة مفتوحة على مدار الساعة'),
+])
+def test_every_language_can_be_detected_after_a_different_language(knowledge_settings, language, question, reply):
+    llm=FakeKnowledgeLLM('The library is open 24 hours {cite:open 24 hours}.', replies_in={
+        'Simplified Chinese':'图书馆全天开放{cite:open 24 hours}。',
+        'Hindi':'पुस्तकालय 24 घंटे खुला है{cite:open 24 hours}।',
+        'Modern Standard Arabic':'المكتبة مفتوحة على مدار الساعة{cite:open 24 hours}.'})
+    rag=build_rag(knowledge_settings,llm,translator=FakeTranslator({question:'What are the library opening hours?'}))
+    # Seed a different language in the same conversation.
+    rag.chat('What are the library opening hours?',ui_language='ar' if language=='en' else 'en',auto_detect=False,session_id='languages')
+    result=rag.chat(question,session_id='languages')
+    assert result.effective_language == language
+    assert reply in result.answer_markdown
+    assert result.citations[0]['url'] == OPENING_HOURS_URL
+
+
+@pytest.mark.parametrize('instruction,language', [
+    ('请用阿拉伯语回答','ar'),
+    ('الرجاء الرد باللغة الإنجليزية','en'),
+    ('कृपया अंग्रेज़ी में उत्तर दें','en'),
+    ('请用印地语回答','hi'),
+])
+def test_explicit_reply_language_requests_work_in_supported_scripts(knowledge_settings, instruction, language):
+    rag=build_rag(knowledge_settings,FakeKnowledgeLLM('Library information.'),translator=FakeTranslator())
+    assert rag.chat('Library opening hours? '+instruction).effective_language == language
+
+
+@pytest.mark.parametrize('language,title', [('en','Library hours'),('zh-Hans','图书馆时间'),('hi','पुस्तकालय का समय'),('ar','ساعات المكتبة')])
+def test_source_title_localization_preserves_links_in_every_language(knowledge_settings, language, title):
+    class SourceTitles(FakeKnowledgeLLM):
+        def chat_json(self,*args,**kwargs):
+            result=super().chat_json(*args,**kwargs)
+            result['source_titles']={OPENING_HOURS_URL:title}
+            return result
+    rag=build_rag(knowledge_settings,SourceTitles('24 {cite:open 24 hours}.'),translator=FakeTranslator())
+    result=rag.chat('What are the library opening hours?',ui_language=language,auto_detect=False)
+    assert result.citations[0]['title'] == title
+    assert result.citations[0]['url'] == OPENING_HOURS_URL
+    assert result.citations[0]['number'] == 1

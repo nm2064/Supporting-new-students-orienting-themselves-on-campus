@@ -72,7 +72,7 @@ def test_home_layout_and_language_settings_work_across_sizes(page, width):
     page.get_by_text('Settings', exact=True).click()
     page.get_by_label('Language', exact=True).select_option('ar')
     assert page.locator('html').get_attribute('dir') == 'rtl'
-    page.get_by_label('Dark mode', exact=True).check()
+    page.get_by_label('الوضع الداكن', exact=True).check()
     assert 'dark' in page.locator('html').get_attribute('class')
     assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
     page.reload()
@@ -145,3 +145,35 @@ def test_chinese_chat_starters_fill_chinese_messages(page):
     page.get_by_role('button', name='图书馆开放时间', exact=True).click()
     assert page.get_by_role('textbox', name='发送给校园助手的消息').input_value() == '图书馆什么时候开放？'
     assert page.get_by_role('button', name='发送消息', exact=True).is_visible()
+
+
+@pytest.mark.parametrize('language,heading,done,starter,message,composer,direction', [
+    ('en','Your preferences','Done','Library opening hours','When is the library open?','Message to UniBot','ltr'),
+    ('zh-Hans','偏好设置','完成','图书馆开放时间','图书馆什么时候开放？','发送给校园助手的消息','ltr'),
+    ('hi','आपकी प्राथमिकताएँ','हो गया','पुस्तकालय का समय','पुस्तकालय कब खुलता है?','यूनीबॉट को संदेश','ltr'),
+    ('ar','تفضيلاتك','تم','ساعات عمل المكتبة','متى تفتح المكتبة؟','رسالة إلى يونيبوت','rtl'),
+])
+def test_all_languages_localize_settings_and_chat_starters(page, language, heading, done, starter, message, composer, direction):
+    page.goto(page.base_url)
+    page.get_by_role('button',name='Settings',exact=True).click()
+    page.get_by_label('Language',exact=True).select_option(language)
+    assert page.get_by_role('heading',name=heading,exact=True).is_visible()
+    assert page.locator('html').get_attribute('dir') == direction
+    page.get_by_role('button',name=done,exact=True).click()
+    page.goto(page.base_url+'/chat')
+    page.get_by_role('button',name=starter,exact=True).click()
+    assert page.get_by_role('textbox',name=composer,exact=True).input_value() == message
+
+
+@pytest.mark.parametrize('language,prompt', [
+    ('zh-Hans','搜索校园建筑，开始使用'),
+    ('hi','शुरू करने के लिए परिसर की इमारत खोजें'),
+    ('ar','ابحث عن مبنى في الحرم للبدء'),
+])
+def test_map_empty_state_is_localized_for_every_non_english_language(page, language, prompt):
+    page.route('**/api/opening-hours*',lambda r:r.fulfill(json=[]))
+    page.goto(page.base_url)
+    page.get_by_role('button',name='Settings',exact=True).click()
+    page.get_by_label('Language',exact=True).select_option(language)
+    page.goto(page.base_url+'/map')
+    assert page.get_by_text(prompt,exact=True).is_visible()
