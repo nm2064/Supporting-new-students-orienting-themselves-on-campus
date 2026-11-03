@@ -270,3 +270,98 @@ def test_the_server_keeps_a_bounded_number_of_conversations_dropping_the_least_r
 
     assert rag.get_session_history("a") == []
     assert rag.get_session_history("b") != [] and rag.get_session_history("c") != []
+
+
+def test_auto_detection_changes_language_when_student_switches_to_chinese(knowledge_settings):
+    chinese = '请告诉我图书馆的开放时间。'
+    llm = FakeKnowledgeLLM(
+        'The library is open 24 hours a day {cite:open 24 hours}.',
+        replies_in={'Simplified Chinese': '图书馆全天开放{cite:open 24 hours}。'},
+    )
+    rag = build_rag(knowledge_settings, llm, translator=FakeTranslator({chinese:'What are the library opening hours?'}))
+    rag.chat('What are the library opening hours?', session_id='switch')
+    answer = rag.chat(chinese, session_id='switch')
+    assert answer.effective_language == 'zh-Hans'
+    assert answer.answer_markdown == '图书馆全天开放[1]。'
+    assert answer.citations[0]['url'] == OPENING_HOURS_URL
+
+
+@pytest.mark.parametrize('question', ['GRID怎么走？', '图书馆', 'Learning Commons几点关门？'])
+def test_chinese_script_is_detected_with_short_queries_and_english_place_names(knowledge_settings, question):
+    llm = FakeKnowledgeLLM('Library information {cite:open 24 hours}.', replies_in={
+        'Simplified Chinese':'图书馆全天开放{cite:open 24 hours}。'})
+    rag = build_rag(knowledge_settings, llm, translator=FakeTranslator({question:'What are the library opening hours?'}))
+    answer = rag.chat(question, session_id='mixed')
+    assert answer.effective_language == 'zh-Hans'
+    assert answer.answer_markdown == '图书馆全天开放[1]。'
+
+
+def test_mixed_chinese_answer_is_localized_without_losing_citations(knowledge_settings):
+    class MixedLanguageLLM(FakeKnowledgeLLM):
+        def chat_json(self, system_prompt, user_prompt, **kwargs):
+            if 'LOCALIZE_FINAL' in system_prompt:
+                return {'answer_markdown':'图书馆全天开放[1]。学习共享空间开放至午夜。',
+                        'follow_up_suggestions':['如何预约学习室？']}
+            return super().chat_json(system_prompt, user_prompt, **kwargs)
+    question = '图书馆什么时候开放？'
+    rag = build_rag(knowledge_settings, MixedLanguageLLM(
+        '图书馆全天开放{cite:open 24 hours}。Learning Commons open until midnight.',
+        follow_ups=['How can I book a study room?']),
+        translator=FakeTranslator({question:'What are the library opening hours?'}))
+    response = rag.chat(question)
+    assert response.answer_markdown == '图书馆全天开放[1]。学习共享空间开放至午夜。'
+    assert response.follow_up_suggestions == ['如何预约学习室？']
+    assert response.citations[0]['url'] == OPENING_HOURS_URL
+
+
+def test_auto_detect_honors_explicit_reply_language_and_keeps_input_language_separate(knowledge_settings):
+    llm = FakeKnowledgeLLM('The library is open {cite:open 24 hours}.', replies_in={
+        'Simplified Chinese':'图书馆全天开放{cite:open 24 hours}。'})
+    rag = build_rag(knowledge_settings, llm, translator=FakeTranslator())
+    response = rag.chat('What are the library opening hours? Please answer in Chinese.', session_id='request')
+    assert response.effective_language == 'zh-Hans'
+    assert response.answer_markdown == '图书馆全天开放[1]。'
+
+
+def test_short_ambiguous_acknowledgement_keeps_previous_language_and_clear_english_switches_back(knowledge_settings):
+    chinese='图书馆什么时候开放？'
+    llm=FakeKnowledgeLLM('Library information.', replies_in={'Simplified Chinese':'图书馆信息。'})
+    rag=build_rag(knowledge_settings,llm,translator=FakeTranslator({chinese:'What are the library opening hours?'}))
+    rag.chat(chinese,session_id='weak')
+    assert rag.chat('ok',session_id='weak').effective_language == 'zh-Hans'
+    assert rag.chat('What are the library opening hours?',session_id='weak').effective_language == 'en'
+
+
+def test_manual_reply_language_is_respected_with_a_chinese_question(knowledge_settings):
+    chinese='图书馆什么时候开放？'
+    rag=build_rag(knowledge_settings,FakeKnowledgeLLM('The library is open {cite:open 24 hours}.'),translator=FakeTranslator({chinese:'What are the library opening hours?'}))
+    result=rag.chat(chinese,ui_language='en',auto_detect=False)
+    assert result.effective_language == 'en'
+    assert result.used_retrieval
+
+
+def test_chinese_citation_titles_are_localized_but_keep_original_links(knowledge_settings):
+    class LocalizedSources(FakeKnowledgeLLM):
+        def chat_json(self, *args, **kwargs):
+            result = super().chat_json(*args, **kwargs)
+            result['source_titles'] = {OPENING_HOURS_URL:'图书馆开放时间'}
+            return result
+    question='图书馆什么时候开放？'
+    rag=build_rag(knowledge_settings,LocalizedSources('图书馆全天开放{cite:open 24 hours}。'),translator=FakeTranslator({question:'What are the library opening hours?'}))
+    response=rag.chat(question)
+    assert response.citations[0]['title'] == '图书馆开放时间'
+    assert response.citations[0]['url'] == OPENING_HOURS_URL
+    assert response.answer_markdown == '图书馆全天开放[1]。'
+
+
+def test_language_repair_cannot_drop_citations_or_replace_source_links(knowledge_settings):
+    class UnsafeRewrite(FakeKnowledgeLLM):
+        def chat_json(self, system_prompt, user_prompt, **kwargs):
+            if 'LOCALIZE_FINAL' in system_prompt:
+                return {'answer_markdown':'图书馆开放。','follow_up_suggestions':[]}
+            return super().chat_json(system_prompt,user_prompt,**kwargs)
+    question='图书馆什么时候开放？'
+    rag=build_rag(knowledge_settings,UnsafeRewrite('图书馆 open all day {cite:open 24 hours}.'),translator=FakeTranslator({question:'What are the library opening hours?'}))
+    response=rag.chat(question)
+    assert '[1]' in response.answer_markdown
+    assert response.citations[0]['url'] == OPENING_HOURS_URL

@@ -123,3 +123,25 @@ def test_settings_done_and_outside_click_dismiss_panel_and_keep_preferences(page
     page.reload()
     page.get_by_role('button', name='Settings', exact=True).click()
     assert page.get_by_label('Campus', exact=True).input_value() == 'dubai'
+
+
+def test_chinese_settings_and_home_have_localized_controls(page):
+    page.goto(page.base_url)
+    page.get_by_role('button', name='Settings', exact=True).click()
+    page.get_by_label('Language', exact=True).select_option('zh-Hans')
+    assert page.get_by_role('heading', name='偏好设置', exact=True).is_visible()
+    assert page.get_by_role('button', name='完成', exact=True).is_visible()
+    page.get_by_role('button', name='完成', exact=True).click()
+    assert page.get_by_role('heading', name='开启你的校园生活', exact=True).is_visible()
+    assert page.get_by_role('link', name='探索校园').is_visible()
+
+
+def test_chinese_chat_starters_fill_chinese_messages(page):
+    page.goto(page.base_url)
+    page.get_by_role('button', name='Settings', exact=True).click()
+    page.get_by_label('Language', exact=True).select_option('zh-Hans')
+    page.get_by_role('button', name='完成', exact=True).click()
+    page.goto(page.base_url + '/chat')
+    page.get_by_role('button', name='图书馆开放时间', exact=True).click()
+    assert page.get_by_role('textbox', name='发送给校园助手的消息').input_value() == '图书馆什么时候开放？'
+    assert page.get_by_role('button', name='发送消息', exact=True).is_visible()

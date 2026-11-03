@@ -544,6 +544,75 @@
             return I18N[activeLanguage] || I18N.en;
         };
 
+        const CHINESE_COPY = {
+            "Settings": "设置",
+            "Your preferences": "偏好设置",
+            "Make UniBot work for you.": "按你的需要设置校园助手。",
+            "Close settings": "关闭设置",
+            "Campus": "校区",
+            "Language": "语言",
+            "Edinburgh": "爱丁堡",
+            "Scottish Borders": "苏格兰边区",
+            "Orkney": "奥克尼",
+            "Dubai": "迪拜",
+            "Malaysia": "马来西亚",
+            "Sets the context for events, services and answers.": "用于选择活动、服务及回答所对应的校区。",
+            "Detect reply language": "自动识别回复语言",
+            "Reply in the language you write in.": "根据每条消息的语言回复。",
+            "Dark mode": "深色模式",
+            "A darker appearance for low light.": "适合光线较暗环境的显示效果。",
+            "Changes save automatically": "更改会自动保存",
+            "Done": "完成",
+            "A place to make your own": "找到属于你的校园生活",
+            "Discover Orkney": "探索奥克尼",
+            "Your campus. Your language. A little help settling in.": "熟悉校园，用你的语言，轻松开启大学生活。",
+            "Make yourself at home": "开启你的校园生活",
+            "Find your next step.": "找到适合你的下一步。",
+            "Explore campus": "探索校园",
+            "Find a building. Plan your route. Feel your way around.": "查找建筑、规划路线，熟悉校园。",
+            "Find support": "寻找支持",
+            "From study support to wellbeing, find the right people.": "从学习支持到身心健康，找到合适的帮助。",
+            "Meet people and find something to look forward to.": "认识新朋友，发现值得期待的活动。",
+            "See what’s on": "查看活动",
+            "Campus photography: Heriot-Watt University": "校园图片来源：赫瑞瓦特大学",
+            "Privacy & your conversation": "隐私与对话",
+            "Library opening hours": "图书馆开放时间",
+            "Find my way": "校园导航",
+            "Meet people": "结识朋友",
+            "Get support": "获取支持",
+            "When is the library open?": "图书馆什么时候开放？",
+            "How do I find the main library?": "怎么去主图书馆？",
+            "What student events are coming up?": "近期有哪些学生活动？",
+            "Where can I find student support?": "在哪里可以获得学生支持？",
+            "Conversation starters": "试试这些问题",
+            "Draft answer · checking citations": "回答草稿 · 正在核对来源",
+            "Checking sources and preparing your answer…": "正在查阅资料并准备回答……",
+            "Contact student support for personal guidance": "联系学生支持部门，获取针对你的帮助",
+            "Find a place on the map": "在地图上查找地点",
+            "Message to UniBot": "发送给校园助手的消息",
+            "Send message": "发送消息",
+            "Campus opening hours": "校园开放时间",
+            "Loading university information…": "正在加载学校信息……",
+            "Try again": "重试",
+            "View event": "查看活动",
+            "Find venue": "查找地点",
+            "About this service": "服务详情",
+            "Visit official page": "访问官方页面",
+            "No opening hours are available here. Ask UniBot or check the venue’s official page.": "暂无开放时间。请询问校园助手或查看该场所的官方页面。",
+            "Reply language": "回复语言",
+            "You are here": "你在这里",
+            "Information could not be loaded.": "信息加载失败。",
+            "venue local time": "场所当地时间",
+            "Official university information": "学校官方信息",
+            "Check the source for the latest details.": "请查看来源页面，确认最新详情。",
+            "No upcoming events are listed for this campus. Try another campus in Settings.": "该校区暂无即将举行的活动。可在设置中切换校区。",
+            "No services are listed for this campus. Try another campus in Settings.": "该校区暂无服务信息。可在设置中切换校区。",
+            "Messages are sent to our server and AI provider, and may be translated by an external service. Server conversations expire after 30 minutes of inactivity. Reloading starts a new conversation. Avoid sharing sensitive personal information. Provider policies also apply.": "你的消息会发送至我们的服务器和人工智能服务商，也可能通过外部服务翻译。服务器中的对话在闲置三十分钟后过期。重新加载页面会开始新对话。请勿分享敏感个人信息；服务商的隐私政策同样适用。"
+};
+        const useCopy = () => {
+            const {activeLanguage} = useLanguage();
+            return text => activeLanguage === "zh-Hans" ? (CHINESE_COPY[text] || text) : text;
+        };
         const BottomNav = ({ active }) => {
             const t = useT();
             const items = [
@@ -577,6 +646,7 @@
             return <PreferencesContext.Provider value={{campus, setCampus, dark, setDark}}>{children}</PreferencesContext.Provider>;
         };
         const SettingsControls = () => {
+            const c = useCopy();
             const {campus, setCampus, dark, setDark} = usePreferences();
             const {uiLanguage, setLanguage, autoDetectEnabled, toggleAutoDetect} = useLanguage();
             const panel = useRef(null);
@@ -604,25 +674,25 @@
             }, [uiLanguage]);
             const close = () => { panel.current.hidePopover(); trigger.current.focus(); };
             return <React.Fragment>
-                <button ref={trigger} className="settings-trigger" aria-label="Settings" aria-haspopup="dialog" aria-expanded={open} aria-controls={id}
+                <button ref={trigger} className="settings-trigger" aria-label={c("Settings")} aria-haspopup="dialog" aria-expanded={open} aria-controls={id}
                     onClick={() => { panel.current.togglePopover(); if (panel.current.matches(":popover-open")) { positionPanel(); panel.current.querySelector("button").focus(); } }}>
-                    <span className="material-symbols-outlined" aria-hidden="true">tune</span><span>Settings</span>
+                    <span className="material-symbols-outlined" aria-hidden="true">tune</span><span>{c("Settings")}</span>
                 </button>
-                <div ref={panel} id={id} popover="auto" role="dialog" aria-label="Settings" className="settings-panel">
-                    <div className="settings-heading"><div><h2>Your preferences</h2><p>Make UniBot work for you.</p></div><button onClick={close} aria-label="Close settings" className="settings-close"><span className="material-symbols-outlined" aria-hidden="true">close</span></button></div>
+                <div ref={panel} id={id} popover="auto" role="dialog" aria-label={c("Settings")} className="settings-panel">
+                    <div className="settings-heading"><div><h2>{c("Your preferences")}</h2><p>{c("Make UniBot work for you.")}</p></div><button onClick={close} aria-label={c("Close settings")} className="settings-close"><span className="material-symbols-outlined" aria-hidden="true">close</span></button></div>
                     <div className="settings-fields">
-                        <label className="settings-field"><span><span className="material-symbols-outlined" aria-hidden="true">location_on</span>Campus</span>
-                            <select aria-label="Campus" value={campus} onChange={e => setCampus(e.target.value)}>
-                                {[["edinburgh","Edinburgh"],["scottish-borders","Scottish Borders"],["orkney","Orkney"],["dubai","Dubai"],["malaysia","Malaysia"]].map(([value,label]) => <option key={value} value={value}>{label}</option>)}
-                            </select><small>Sets the context for events, services and answers.</small>
+                        <label className="settings-field"><span><span className="material-symbols-outlined" aria-hidden="true">location_on</span>{c("Campus")}</span>
+                            <select aria-label={c("Campus")} value={campus} onChange={e => setCampus(e.target.value)}>
+                                {[["edinburgh",c("Edinburgh")],["scottish-borders",c("Scottish Borders")],["orkney",c("Orkney")],["dubai",c("Dubai")],["malaysia",c("Malaysia")]].map(([value,label]) => <option key={value} value={value}>{c(label)}</option>)}
+                            </select><small>{c("Sets the context for events, services and answers.")}</small>
                         </label>
-                        <label className="settings-field"><span><span className="material-symbols-outlined" aria-hidden="true">language</span>Language</span>
-                            <select aria-label="Language" value={uiLanguage} onChange={e => setLanguage(e.target.value)}>{LANG_OPTIONS.map(l => <option key={l.id} value={l.id}>{l.label}</option>)}</select>
+                        <label className="settings-field"><span><span className="material-symbols-outlined" aria-hidden="true">language</span>{c("Language")}</span>
+                            <select aria-label={c("Language")} value={uiLanguage} onChange={e => setLanguage(e.target.value)}>{LANG_OPTIONS.map(l => <option key={l.id} value={l.id}>{l.label}</option>)}</select>
                         </label>
-                        <label className="settings-toggle"><span><strong>Detect reply language</strong><small>Reply in the language you write in.</small></span><input aria-label="Detect reply language" type="checkbox" checked={autoDetectEnabled} onChange={toggleAutoDetect}/></label>
-                        <label className="settings-toggle"><span><strong>Dark mode</strong><small>A darker appearance for low light.</small></span><input aria-label="Dark mode" type="checkbox" checked={dark} onChange={e => setDark(e.target.checked)}/></label>
+                        <label className="settings-toggle"><span><strong>{c("Detect reply language")}</strong><small>{c("Reply in the language you write in.")}</small></span><input aria-label={c("Detect reply language")} type="checkbox" checked={autoDetectEnabled} onChange={toggleAutoDetect}/></label>
+                        <label className="settings-toggle"><span><strong>{c("Dark mode")}</strong><small>{c("A darker appearance for low light.")}</small></span><input aria-label={c("Dark mode")} type="checkbox" checked={dark} onChange={e => setDark(e.target.checked)}/></label>
                     </div>
-                    <div className="settings-footer"><span>Changes save automatically</span><button onClick={close}>Done</button></div>
+                    <div className="settings-footer"><span>{c("Changes save automatically")}</span><button onClick={close}>{c("Done")}</button></div>
                 </div>
             </React.Fragment>;
         };
@@ -646,25 +716,26 @@
 
         const CampusPhoto = ({campus, className = "", decorative = false}) => <img className={className} src={`/images/campus/${campus}.webp`} alt={decorative ? "" : campus === "orkney" ? "Skara Brae in Orkney" : `${campus.replaceAll("-", " ").replace(/^./, c => c.toUpperCase())} campus`} loading="lazy" width="1280" height="720"/>;
         const HomePage = () => {
+            const c = useCopy();
             const t = useT();
             const {campus} = usePreferences();
             return <div className="discovery-page min-h-screen pb-24"><Header/>
                 <main className="discovery-main">
                     <section className="campus-hero">
-                        <div className="hero-copy"><span className="campus-badge"><span className="material-symbols-outlined">location_on</span>{campus.replaceAll("-", " ")}</span>
+                        <div className="hero-copy"><span className="campus-badge"><span className="material-symbols-outlined">location_on</span>{c(({edinburgh:"Edinburgh","scottish-borders":"Scottish Borders",orkney:"Orkney",dubai:"Dubai",malaysia:"Malaysia"})[campus])}</span>
                             <h2>{t.homeTitle}</h2><p>{t.homeSubtitle}</p>
                             <Link to="/chat" className="primary-action"><span className="material-symbols-outlined">auto_awesome</span>{t.navChat}<span aria-hidden="true">↗</span></Link>
-                            <p className="hero-note">Your campus. Your language. A little help settling in.</p>
+                            <p className="hero-note">{c("Your campus. Your language. A little help settling in.")}</p>
                         </div>
-                        <div className="hero-photo"><CampusPhoto campus={campus}/><span className="photo-caption">{campus === "orkney" ? "Discover Orkney" : "A place to make your own"}</span></div>
+                        <div className="hero-photo"><CampusPhoto campus={campus}/><span className="photo-caption">{campus === "orkney" ? c("Discover Orkney") : c("A place to make your own")}</span></div>
                     </section>
-                    <div className="section-heading"><h2>Make yourself at home</h2><p>Find your next step.</p></div>
+                    <div className="section-heading"><h2>{c("Make yourself at home")}</h2><p>{c("Find your next step.")}</p></div>
                     <section className="explore-grid" aria-label="Explore UniBot">
-                        <Link to="/map" className="explore-card map-explore"><div className="map-art" aria-hidden="true"><span className="material-symbols-outlined">location_on</span><span className="map-art-label">You are here</span></div><div className="explore-copy"><h3>Explore campus</h3><p>Find a building. Plan your route. Feel your way around.</p><span>{t.navMap} ↗</span></div></Link>
-                        <Link to="/services" className="explore-card support-explore"><span className="card-symbol material-symbols-outlined" aria-hidden="true">volunteer_activism</span><div className="explore-copy"><h3>{t.navServices}</h3><p>From study support to wellbeing, find the right people.</p><span>Find support ↗</span></div></Link>
-                        <Link to="/events" className="explore-card events-explore"><CampusPhoto campus={campus} decorative/><div className="explore-copy"><h3>{t.navEvents}</h3><p>Meet people and find something to look forward to.</p><span>See what’s on ↗</span></div></Link>
+                        <Link to="/map" className="explore-card map-explore"><div className="map-art" aria-hidden="true"><span className="material-symbols-outlined">location_on</span><span className="map-art-label">{c("You are here")}</span></div><div className="explore-copy"><h3>{c("Explore campus")}</h3><p>{c("Find a building. Plan your route. Feel your way around.")}</p><span>{t.navMap} ↗</span></div></Link>
+                        <Link to="/services" className="explore-card support-explore"><span className="card-symbol material-symbols-outlined" aria-hidden="true">volunteer_activism</span><div className="explore-copy"><h3>{t.navServices}</h3><p>{c("From study support to wellbeing, find the right people.")}</p><span>{c("Find support")} ↗</span></div></Link>
+                        <Link to="/events" className="explore-card events-explore"><CampusPhoto campus={campus} decorative/><div className="explore-copy"><h3>{t.navEvents}</h3><p>{c("Meet people and find something to look forward to.")}</p><span>{c("See what’s on")} ↗</span></div></Link>
                     </section>
-                    <footer className="discovery-footer"><span>Campus photography: Heriot-Watt University</span><details><summary>Privacy & your conversation</summary><p>Messages are sent to our server and AI provider, and may be translated by an external service. Server conversations expire after 30 minutes of inactivity. Reloading starts a new conversation. Avoid sharing sensitive personal information. Provider policies also apply.</p></details></footer>
+                    <footer className="discovery-footer"><span>{c("Campus photography: Heriot-Watt University")}</span><details><summary>{c("Privacy & your conversation")}</summary><p>{c("Messages are sent to our server and AI provider, and may be translated by an external service. Server conversations expire after 30 minutes of inactivity. Reloading starts a new conversation. Avoid sharing sensitive personal information. Provider policies also apply.")}</p></details></footer>
                 </main><BottomNav active="home"/></div>;
         };
 
@@ -840,6 +911,7 @@
         };
 
         const ChatPage = () => {
+            const c = useCopy();
             const t = useT();
             const { uiLanguage, autoDetectEnabled, setSessionDetectedLanguage } = useLanguage();
             const {campus} = usePreferences();
@@ -1004,7 +1076,7 @@
                                 <h2 className="font-bold">UniBot</h2>
                                 <p className="text-xs text-gray-500">
                                     {lastEffectiveLanguage
-                                        ? `Reply language: ${{en: "English", "zh-Hans": "简体中文", hi: "हिन्दी", ar: "العربية"}[lastEffectiveLanguage] || lastEffectiveLanguage}`
+                                        ? `${c("Reply language")}: ${{en: "English", "zh-Hans": "简体中文", hi: "हिन्दी", ar: "العربية"}[lastEffectiveLanguage] || lastEffectiveLanguage}`
                                         : "Heriot-Watt campus assistant"}
                                 </p>
                             </div>
@@ -1020,8 +1092,8 @@
                                             {isUser
                                                 ? <div className="whitespace-pre-wrap text-sm leading-relaxed">{msg.text}</div>
                                                 : <AnswerBody text={msg.text} citations={msg.citations} />}
-                                            {!isUser && msg.needsHumanHandoff && <p className="mt-3 text-sm"><Link className="underline" to="/services">Contact student support for personal guidance</Link></p>}
-                                            {!isUser && <Link className="block mt-2 text-xs underline" to={`/map?q=${encodeURIComponent((msg.text.match(/library|Oriam|student union|GRID|Learning Commons/i) || [""])[0])}`}>Find a place on the map</Link>}
+                                            {!isUser && msg.needsHumanHandoff && <p className="mt-3 text-sm"><Link className="underline" to="/services">{c("Contact student support for personal guidance")}</Link></p>}
+                                            {!isUser && <Link className="block mt-2 text-xs underline" to={`/map?q=${encodeURIComponent((msg.text.match(/library|Oriam|student union|GRID|Learning Commons/i) || [""])[0])}`}>{c("Find a place on the map")}</Link>}
                                             {!isUser && (
                                                 <SourceList
                                                     citations={msg.citations}
@@ -1033,14 +1105,14 @@
                                     </div>
                                 );
                             })}
-                            {messages.length === 1 && !loading && <div className="chat-starters" aria-label="Conversation starters">{[
-                                ["local_library", "Library opening hours", "When is the library open?"],
-                                ["explore", "Find my way", "How do I find the main library?"],
-                                ["groups", "Meet people", "What student events are coming up?"],
-                                ["volunteer_activism", "Get support", "Where can I find student support?"]
+                            {messages.length === 1 && !loading && <div className="chat-starters" aria-label={c("Conversation starters")}>{[
+                                ["local_library", c("Library opening hours"), c("When is the library open?")],
+                                ["explore", c("Find my way"), c("How do I find the main library?")],
+                                ["groups", c("Meet people"), c("What student events are coming up?")],
+                                ["volunteer_activism", c("Get support"), c("Where can I find student support?")]
                             ].map(([icon,label,question]) => <button key={icon} aria-label={label} onClick={() => setInput(question)}><span className="material-symbols-outlined" aria-hidden="true">{icon}</span><span>{label}</span></button>)}</div>}
-                            {loading && preview && <div className="p-3 bg-gray-100 dark:bg-gray-800 rounded-xl"><p className="text-xs mb-2">Draft answer · checking citations</p><p className="whitespace-pre-wrap text-sm">{preview}</p></div>}
-                            {loading && <div role="status" className="text-sm text-gray-500">Checking sources and preparing your answer…</div>}
+                            {loading && preview && <div className="p-3 bg-gray-100 dark:bg-gray-800 rounded-xl"><p className="text-xs mb-2">{c("Draft answer · checking citations")}</p><p className="whitespace-pre-wrap text-sm">{preview}</p></div>}
+                            {loading && <div role="status" className="text-sm text-gray-500">{c("Checking sources and preparing your answer…")}</div>}
                         </div>
 
                         {followUps.length > 0 && (
@@ -1057,7 +1129,7 @@
                         <div className="p-4 border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
                             <div className="flex items-center gap-2 bg-gray-100 dark:bg-gray-800 rounded-2xl px-3 py-2">
                                 <input
-                                    aria-label="Message to UniBot"
+                                    aria-label={c("Message to UniBot")}
                                     className="flex-1 appearance-none border-0 bg-transparent px-1 py-2 text-sm outline-none shadow-none ring-0 focus:border-0 focus:outline-none focus:ring-0 focus:ring-transparent focus:ring-offset-0 focus:shadow-none"
                                     style={{ boxShadow: "none" }}
                                     value={input}
@@ -1065,7 +1137,7 @@
                                     onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); sendMessage(); }}}
                                     placeholder={t.chatPlaceholder}
                                 />
-                                <button aria-label="Send message" onClick={sendMessage} disabled={loading || !input.trim()} className="bg-primary text-white w-10 h-10 rounded-xl disabled:opacity-50">
+                                <button aria-label={c("Send message")} onClick={sendMessage} disabled={loading || !input.trim()} className="bg-primary text-white w-10 h-10 rounded-xl disabled:opacity-50">
                                     <span className="material-symbols-outlined text-xl">send</span>
                                 </button>
                             </div>
@@ -1717,6 +1789,7 @@
         };
 
         const MapHours = ({campus}) => {
+            const c = useCopy();
             const [hours, setHours] = useState([]);
             useEffect(() => {
                 let active = true;
@@ -1725,12 +1798,15 @@
                     .then(r => r.ok ? r.json() : []).then(data => {if (active) setHours(data);}).catch(() => {});
                 return () => {active = false;};
             }, [campus]);
-            return <details className="p-3 text-sm bg-white text-gray-900"><summary>Campus opening hours</summary>
-                {hours.length ? hours.map(h => <div key={h.url} className="py-2"><a className="underline" target="_blank" rel="noopener noreferrer" href={h.url}>{h.title}</a><p className="whitespace-pre-line mt-2">{h.description}</p></div>) : <p className="py-2">No opening hours are available here. Ask UniBot or check the venue’s official page.</p>}
+            return <details className="p-3 text-sm bg-white text-gray-900"><summary>{c("Campus opening hours")}</summary>
+                {hours.length ? hours.map(h => <div key={h.url} className="py-2"><a className="underline" target="_blank" rel="noopener noreferrer" href={h.url}>{h.title}</a><p className="whitespace-pre-line mt-2">{h.description}</p></div>) : <p className="py-2">{c("No opening hours are available here. Ask UniBot or check the venue’s official page.")}</p>}
             </details>;
         };
         const CampusInformationPage = ({events = false}) => {
+            const c = useCopy();
             const t = useT();
+            const {activeLanguage} = useLanguage();
+            const localeTag = activeLanguage === "zh-Hans" ? "zh-CN" : activeLanguage;
             const {campus} = usePreferences();
             const [items, setItems] = useState([]);
             const [status, setStatus] = useState("loading");
@@ -1746,16 +1822,16 @@
             }, [campus, events, retry]);
             return <div className="min-h-screen pb-24"><Header />
                 <main className="max-w-[960px] mx-auto px-4 py-8">
-                    <section className="resource-banner"><div><span className="campus-badge">{campus.replaceAll("-", " ")}</span><h2 className="text-3xl font-black">{events ? t.eventsTitle : t.servicesTitle}</h2></div><CampusPhoto campus={campus} decorative/></section>
-                    <p className="mt-3">Official university information for {campus.replaceAll("-", " ")}. Check the source for the latest details.</p>
-                    {status === "loading" && <p role="status" className="py-6">Loading university information…</p>}
-                    {status === "error" && <p role="alert" className="py-6">Information could not be loaded. <button className="underline" onClick={() => setRetry(n => n+1)}>Try again</button></p>}
-                    {status === "ready" && !items.length && <p className="py-6">No {events ? "upcoming events" : "services"} are listed for this campus. Try another campus in Settings.</p>}
+                    <section className="resource-banner"><div><span className="campus-badge">{c(({edinburgh:"Edinburgh","scottish-borders":"Scottish Borders",orkney:"Orkney",dubai:"Dubai",malaysia:"Malaysia"})[campus])}</span><h2 className="text-3xl font-black">{events ? t.eventsTitle : t.servicesTitle}</h2></div><CampusPhoto campus={campus} decorative/></section>
+                    <p className="mt-3">{c("Official university information")} · {c(({edinburgh:"Edinburgh","scottish-borders":"Scottish Borders",orkney:"Orkney",dubai:"Dubai",malaysia:"Malaysia"})[campus])} · {c("Check the source for the latest details.")}</p>
+                    {status === "loading" && <p role="status" className="py-6">{c("Loading university information…")}</p>}
+                    {status === "error" && <p role="alert" className="py-6">{c("Information could not be loaded.")} <button className="underline" onClick={() => setRetry(n => n+1)}>{c("Try again")}</button></p>}
+                    {status === "ready" && !items.length && <p className="py-6">{c(events ? "No upcoming events are listed for this campus. Try another campus in Settings." : "No services are listed for this campus. Try another campus in Settings.")}</p>}
                     {status === "ready" && <div className="resource-grid">{items.map((item, index) => <article key={item.url} aria-label={item.title} className={`resource-card ${events ? "event-card" : "service-card"}`}>
-                        {events ? <div className="event-date" aria-hidden="true"><span>{new Date(item.start).toLocaleDateString(undefined, {month:"short"})}</span><strong>{new Date(item.start).getDate()}</strong><span>{new Date(item.start).toLocaleDateString(undefined, {weekday:"short"})}</span></div> : <div className={`service-icon tone-${index % 3}`} aria-hidden="true"><span className="material-symbols-outlined">{/wellbeing|health/i.test(item.title) ? "favorite" : /career/i.test(item.title) ? "work" : /accommodation/i.test(item.title) ? "home" : /it |comput/i.test(item.title) ? "devices" : "support_agent"}</span></div>}
+                        {events ? <div className="event-date" aria-hidden="true"><span>{new Date(item.start).toLocaleDateString(localeTag, {month:"short"})}</span><strong>{new Date(item.start).getDate()}</strong><span>{new Date(item.start).toLocaleDateString(localeTag, {weekday:"short"})}</span></div> : <div className={`service-icon tone-${index % 3}`} aria-hidden="true"><span className="material-symbols-outlined">{/wellbeing|health/i.test(item.title) ? "favorite" : /career/i.test(item.title) ? "work" : /accommodation/i.test(item.title) ? "home" : /it |comput/i.test(item.title) ? "devices" : "support_agent"}</span></div>}
                         <div className="resource-content"><h3>{item.title}</h3>
-                        {events ? <React.Fragment><p className="event-time"><span className="material-symbols-outlined" aria-hidden="true">schedule</span><time dateTime={item.start}>{new Date(item.start).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"})}</time>{item.end && ` – ${new Date(item.end).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"})}`} · venue local time</p><p className="event-venue"><span className="material-symbols-outlined" aria-hidden="true">location_on</span>{item.location}</p>
-                        <div className="resource-actions"><a href={item.url} target="_blank" rel="noopener noreferrer">View event <span aria-hidden="true">↗</span></a><Link to={`/map?q=${encodeURIComponent(item.location || item.title)}`}>Find venue</Link></div></React.Fragment> : <React.Fragment><p className="service-preview">{item.description}</p><details><summary>About this service</summary><p>{item.description}</p></details><a className="service-action" href={item.url} target="_blank" rel="noopener noreferrer">Visit official page <span aria-hidden="true">↗</span></a></React.Fragment>}
+                        {events ? <React.Fragment><p className="event-time"><span className="material-symbols-outlined" aria-hidden="true">schedule</span><time dateTime={item.start}>{new Date(item.start).toLocaleTimeString(localeTag, {hour:"2-digit",minute:"2-digit"})}</time>{item.end && ` – ${new Date(item.end).toLocaleTimeString(localeTag, {hour:"2-digit",minute:"2-digit"})}`} · {c("venue local time")}</p><p className="event-venue"><span className="material-symbols-outlined" aria-hidden="true">location_on</span>{item.location}</p>
+                        <div className="resource-actions"><a href={item.url} target="_blank" rel="noopener noreferrer">{c("View event")} <span aria-hidden="true">↗</span></a><Link to={`/map?q=${encodeURIComponent(item.location || item.title)}`}>{c("Find venue")}</Link></div></React.Fragment> : <React.Fragment><p className="service-preview">{item.description}</p><details><summary>{c("About this service")}</summary><p>{item.description}</p></details><a className="service-action" href={item.url} target="_blank" rel="noopener noreferrer">{c("Visit official page")} <span aria-hidden="true">↗</span></a></React.Fragment>}
                         </div></article>)}</div>}
 
                 </main><BottomNav active={events ? "events" : "services"}/></div>;

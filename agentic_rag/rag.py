@@ -58,13 +58,19 @@ does not cover, and point to the most relevant cited page or service.
 - Assume the {campus} campus unless the student names another. If the evidence is about a \
 different campus, say so.
 - Write answer_markdown and follow_up_suggestions in {language}. Keep citation markers, \
-URLs and proper names unchanged.
+URLs, email addresses and acronyms such as GRID unchanged. Translate headings,
+facility/service names, days, times, labels and follow-up questions into {language}.
+When answering in Chinese, use 学习共享空间 for Learning Commons and 爱丁堡校区 for
+Edinburgh Campus; do not leave ordinary English descriptions in the answer.
+Use local names or transliteration for proper names when appropriate.
 
 Return a JSON object with keys:
 answer_markdown (string, Markdown),
 follow_up_suggestions (array of up to 3 short questions the student might ask next),
 needs_human_handoff (boolean, true when the student should contact university staff),
-confidence (number from 0 to 1: how fully the evidence answers the question).
+confidence (number from 0 to 1: how fully the evidence answers the question),
+source_titles (object mapping the exact source URLs in the evidence to their page titles
+translated into {language}; translate descriptive words, keep the URLs unchanged).
 """
 
 
@@ -681,6 +687,19 @@ class AgenticRAG:
     def _detect_language(self, text: str) -> tuple[str, float]:
         if not text.strip():
             return "en", 0.0
+        # Script evidence is more reliable than statistical detection for short
+        # questions containing campus names such as "GRID" or "Learning Commons".
+        sample = re.sub(r"https?://\S+|`[^`]*`", "", text)
+        latin_words = re.findall(r"[A-Za-z]+", sample)
+        scripts = [("zh-Hans", r"[\u3400-\u9fff]"), ("ar", r"[\u0600-\u06ff]"), ("hi", r"[\u0900-\u097f]")]
+        for language, pattern in scripts:
+            count = len(re.findall(pattern, sample))
+            if language == "zh-Hans" and re.search(r"[\u3040-\u30ff]", sample):
+                continue
+            if count >= 2 and (len(latin_words) <= 2 or count > sum(map(len, latin_words))):
+                return language, 0.99
+        if len(latin_words) <= 2 and not re.search(r"[^\x00-\x7f]", sample):
+            return "en", 0.0
         try:
             candidates = detect_langs(text)
             if not candidates:
@@ -921,6 +940,7 @@ class AgenticRAG:
             "needs_human_handoff": bool(result.get("needs_human_handoff", False)),
             "confidence": max(0.0, min(1.0, confidence)),
             "written_in": language,
+            "source_titles": result.get("source_titles", {}),
         }
 
     # "[3]" or a grouped "[1, 4]", with any whitespace in front of it.
@@ -1017,23 +1037,24 @@ class AgenticRAG:
                 effective_campus = mentioned[0]
 
         normalized_ui_language = _normalize_ui_language(ui_language)
-        detected_language = normalized_ui_language
-        detection_confidence = 0.0
-
+        detected_language, detection_confidence = self._detect_language(query)
+        confident = (detected_language in SUPPORTED_LANGUAGES and
+                     detection_confidence >= self.settings.language_detection_confidence_threshold)
         if auto_detect:
-            locked_language = self.session_store.get_language_lock(conversation_id)
-            if locked_language in SUPPORTED_LANGUAGES:
-                effective_language = locked_language
-            else:
-                detected_language, detection_confidence = self._detect_language(query)
-                if (
-                    detected_language in SUPPORTED_LANGUAGES
-                    and detection_confidence >= self.settings.language_detection_confidence_threshold
-                ):
-                    effective_language = detected_language
-                else:
-                    effective_language = normalized_ui_language
-                self.session_store.set_language_lock(conversation_id, effective_language)
+            previous = self.session_store.get_language_lock(conversation_id)
+            effective_language = detected_language if confident else (previous or normalized_ui_language)
+            requests = {
+                "zh-Hans": r"(?:\b(?:answer|reply|respond|write|speak)\s+(?:only\s+)?in\s+(?:simplified\s+)?Chinese\b|(?:用|使用|以)(?:简体)?中文(?:回答|回复|作答))",
+                "en": r"(?:\b(?:answer|reply|respond|write|speak)\s+(?:only\s+)?in\s+English\b|(?:用|使用|以)英语(?:回答|回复|作答))",
+                "ar": r"\b(?:answer|reply|respond|write|speak)\s+(?:only\s+)?in\s+Arabic\b",
+                "hi": r"\b(?:answer|reply|respond|write|speak)\s+(?:only\s+)?in\s+Hindi\b",
+            }
+            matches = [(match.start(), language) for language, pattern in requests.items()
+                       for match in re.finditer(pattern, query, re.IGNORECASE)
+                       if not re.search(r"(?:not|never|don't)\s*$", query[:match.start()], re.IGNORECASE)]
+            if matches:
+                effective_language = max(matches)[1]
+            self.session_store.set_language_lock(conversation_id, effective_language)
         else:
             self.session_store.clear_language_lock(conversation_id)
             effective_language = normalized_ui_language
@@ -1053,9 +1074,10 @@ class AgenticRAG:
         # English version of the question, used for routing and retrieval. If
         # machine translation is unavailable this is the original text; the
         # original-language search below still finds multilingual matches.
-        query_en = self._translate_text(query, effective_language, "en")
+        input_language = detected_language if confident else effective_language
+        query_en = self._translate_text(query, input_language, "en")
 
-        decision = self._router_decision(query_en, history, was_translated=effective_language != "en")
+        decision = self._router_decision(query_en, history, was_translated=input_language != "en")
         signpost = signpost_for(query_en, query)
         if signpost is not None and decision.action != "RETRIEVE":
             # Never answer a crisis or a personal visa/medical/legal question with
@@ -1121,6 +1143,12 @@ class AgenticRAG:
         confidence = float(answer_payload.get("confidence", 0.5))
 
         answer_markdown, citations, sources = self._cite_pages(relevant_chunks, answer_markdown)
+        translated_titles = answer_payload.get("source_titles", {})
+        if effective_language != "en" and isinstance(translated_titles, dict):
+            for citation in citations:
+                title = translated_titles.get(citation["url"])
+                if isinstance(title, str) and title.strip():
+                    citation["title"] = title.strip()
 
         # Grounded answers are written in the reply language by the model, so
         # citation markers stay intact. Only fixed English text (greetings,
@@ -1140,6 +1168,33 @@ class AgenticRAG:
             parts = [note, answer_markdown] if signpost.first else [answer_markdown, note]
             answer_markdown = "\n\n".join(part for part in parts if part)
             needs_handoff = True
+
+        # Repair mixed-language prose once, before storing or returning the final
+        # answer. Reject rewrites that change citation markers or destination URLs.
+        if effective_language != "en":
+            prose = re.sub(r"https?://\S+|[\w.+-]+@[\w.-]+", "", " ".join([answer_markdown, *map(str, follow_ups)]))
+            prose = re.sub(r"\b[A-Z0-9]{2,}\b", "", prose)
+            if re.search(r"\b[a-z][a-z]+\b", prose, re.IGNORECASE):
+                try:
+                    localized = self.backend.chat_json(
+                        system_prompt=(
+                            "LOCALIZE_FINAL: Translate ALL prose to " + LANGUAGE_LABELS[effective_language] +
+                            ". Translate facility names, headings and follow-up questions. Keep acronyms, URLs, "
+                            "numbers, facts and every [n] citation exactly unchanged. Add no information. "
+                            "Return JSON with answer_markdown and follow_up_suggestions."
+                        ),
+                        user_prompt=json.dumps({"answer_markdown": answer_markdown, "follow_up_suggestions": follow_ups}, ensure_ascii=False),
+                        model=self.settings.chat_model,
+                    )
+                    candidate = localized.get("answer_markdown", "")
+                    same_markers = sorted(re.findall(r"\[\d+\]", candidate)) == sorted(re.findall(r"\[\d+\]", answer_markdown))
+                    same_urls = re.findall(r"https?://[^\s<>\)]+", candidate) == re.findall(r"https?://[^\s<>\)]+", answer_markdown)
+                    suggestions = localized.get("follow_up_suggestions")
+                    if isinstance(candidate, str) and candidate.strip() and same_markers and same_urls and isinstance(suggestions, list):
+                        answer_markdown = candidate
+                        follow_ups = [str(item) for item in suggestions[:3]]
+                except Exception as error:
+                    logger.warning("Language repair unavailable (%s)", type(error).__name__)
 
         log_event(
             logger,
